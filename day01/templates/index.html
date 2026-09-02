@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Мини ИИ Чат</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+        #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .user { color: blue; } .ai { color: green; }
+    </style>
+</head>
+<body>
+    <h2>🤖 Минимальный ИИ-чат</h2>
+    <div id="chat"></div>
+    <form id="chatForm">
+        <input type="text" id="userInput" style="width: 75%; padding: 8px;" placeholder="Напишите что-нибудь..." required>
+        <button type="submit" style="width: 20%; padding: 8px;">Отправить</button>
+    </form>
+
+    <script>
+        const form = document.getElementById('chatForm');
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('userInput');
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const text = input.value;
+            input.value = '';
+            
+            chat.innerHTML += `<p class="user"><b>Вы:</b> ${text}</p>`;
+            chat.scrollTop = chat.scrollHeight;
+
+            const response = await fetch('/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `text=${encodeURIComponent(text)}`
+            });
+            const data = await response.text();
+            
+            chat.innerHTML += `<p class="ai"><b>ИИ:</b> ${data}</p>`;
+            chat.scrollTop = chat.scrollHeight;
+        };
+    </script>
+</body>
+</html>
