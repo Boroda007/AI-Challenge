@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 from fastapi import FastAPI, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from openai import OpenAI
 from dotenv import load_dotenv
+import markdown
 
 # Загружаем .env из текущей папки
 current_dir = Path(__file__).resolve().parent
@@ -30,6 +31,13 @@ app = FastAPI()
 client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
 
 
+def render_markdown(text: str) -> str:
+    return markdown.markdown(
+        text,
+        extensions=["fenced_code", "tables", "nl2br"],
+    )
+
+
 @app.get("/")
 async def home():
     # Отдаем чистый HTML-файл из папки templates
@@ -44,10 +52,10 @@ async def ask_ai(text: str = Form(...)):
             model=MODEL_NAME, 
             messages=[{"role": "user", "content": text}]
         )
-        return response.choices[0].message.content
+        return HTMLResponse(render_markdown(response.choices[0].message.content))
         
     except Exception as e:
-        return f"Ошибка при запросе к ИИ-роутеру: {str(e)}"
+        return HTMLResponse(f"Ошибка при запросе к ИИ-роутеру: {str(e)}")
 
 # Точка входа
 if __name__ == "__main__":

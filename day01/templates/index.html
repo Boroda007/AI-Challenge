@@ -3,15 +3,25 @@
 <head>
     <title>Мини ИИ Чат</title>
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; line-height: 1.6; }
-        #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
-        .user { color: blue; } .ai { color: green; }
+        body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px 20px 40px 20px; line-height: 1.6; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        h2 { margin: 0 0 10px; flex-shrink: 0; }
+        #chat { border: 1px solid #ccc; flex: 1; overflow-y: scroll; padding: 10px; margin-bottom: 10px; border-radius: 5px; display: flex; flex-direction: column; gap: 8px; }
+        .message { display: flex; }
+        .message.user { justify-content: flex-end; }
+        .message .bubble { padding: 8px 12px; border-radius: 12px; line-height: 1.4; color: #000; }
+        .message.user .bubble { max-width: 75%; background: #e0e0e0; }
+        .message.ai .bubble { background: none; }
+        .message.ai .bubble p { margin: 0 0 8px; }
+        .message.ai .bubble pre { background: #f5f5f5; padding: 8px; overflow-x: auto; border-radius: 4px; }
+        .message.ai .bubble code { font-family: monospace; background: #f0f0f0; padding: 2px 4px; border-radius: 3px; }
+        .message.ai .bubble pre code { background: none; padding: 0; }
+        .message.ai .bubble ul, .message.ai .bubble ol { margin: 0 0 8px; padding-left: 20px; }
     </style>
 </head>
 <body>
     <h2>🤖 Минимальный ИИ-чат</h2>
     <div id="chat"></div>
-    <form id="chatForm">
+    <form id="chatForm" style="flex-shrink: 0;">
         <input type="text" id="userInput" style="width: 75%; padding: 8px;" placeholder="Напишите что-нибудь..." required>
         <button type="submit" style="width: 20%; padding: 8px;">Отправить</button>
     </form>
@@ -21,12 +31,16 @@
         const chat = document.getElementById('chat');
         const input = document.getElementById('userInput');
 
+        function escapeHtml(s) {
+            return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
         form.onsubmit = async (e) => {
             e.preventDefault();
             const text = input.value;
             input.value = '';
             
-            chat.innerHTML += `<p class="user"><b>Вы:</b> ${text}</p>`;
+            chat.innerHTML += `<div class="message user"><div class="bubble">${escapeHtml(text)}</div></div>`;
             chat.scrollTop = chat.scrollHeight;
 
             const response = await fetch('/ask', {
@@ -36,7 +50,7 @@
             });
             const data = await response.text();
             
-            chat.innerHTML += `<p class="ai"><b>ИИ:</b> ${data}</p>`;
+            chat.innerHTML += `<div class="message ai"><div class="bubble">${data}</div></div>`;
             chat.scrollTop = chat.scrollHeight;
         };
     </script>
