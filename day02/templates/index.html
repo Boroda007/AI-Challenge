@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ИИ Чат — Формат ответа</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h2>ИИ Чат — Формат ответа</h2>
+
+    <!-- Панель настроек -->
+    <div class="settings-panel">
+        <!-- Строка заголовков -->
+        <div class="settings-headers">
+            <div class="settings-group-header">Инженерные параметры</div>
+            <div class="settings-group-header">Промпт-инжиниринг</div>
+        </div>
+
+        <!-- Строка параметров -->
+        <div class="settings-body">
+            <!-- Левая колонка -->
+            <div class="settings-group">
+                <div class="setting-row disabled" data-param="response_format">
+                    <input type="checkbox" id="cb-format">
+                    <label for="cb-format">Формат</label>
+                    <select id="sel-format" disabled>
+                        <option value="text">Text</option>
+                        <option value="json">JSON</option>
+                    </select>
+                </div>
+
+                <div class="setting-row disabled" data-param="max_tokens">
+                    <input type="checkbox" id="cb-maxtokens">
+                    <label for="cb-maxtokens">Длина (токены)</label>
+                    <input type="range" id="rng-maxtokens" min="5" max="1000" value="50" disabled>
+                    <span class="value-display" id="val-maxtokens">50</span>
+                </div>
+
+                <div class="setting-row disabled" data-param="stop">
+                    <input type="checkbox" id="cb-stop">
+                    <label for="cb-stop">Стоп-символ</label>
+                    <input type="text" id="txt-stop" placeholder="например: \n" disabled>
+                </div>
+
+                <div class="setting-row disabled" data-param="temperature">
+                    <input type="checkbox" id="cb-temp">
+                    <label for="cb-temp">Температура</label>
+                    <input type="range" id="rng-temp" min="0" max="2" step="0.1" value="0.7" disabled>
+                    <span class="value-display" id="val-temp">0.7</span>
+                </div>
+            </div>
+
+            <!-- Правая колонка -->
+            <div class="settings-group prompt-layout">
+                <div class="setting-row disabled" data-param="system_prompt">
+                    <input type="checkbox" id="cb-sysprompt">
+                    <label for="cb-sysprompt">Системный промпт</label>
+                </div>
+
+                <textarea id="txt-sysprompt" class="prompt-textarea" disabled>Ты робот-аналитик. Отвечай строго, тезисно, без приветствий</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Заголовки колонок -->
+    <div class="chats-header">
+        <div>Без ограничений</div>
+        <div></div>
+        <div>С ограничениями</div>
+    </div>
+
+    <!-- Один скроллируемый контейнер с Grid -->
+    <div class="chats-container" id="chats-container"></div>
+
+    <!-- Форма ввода -->
+    <form id="chatForm">
+        <input type="text" id="userInput" placeholder="Напишите что-нибудь..." required>
+        <button type="submit">Отправить</button>
+    </form>
+
+    <script src="app.js"></script>
+</body>
+</html>
