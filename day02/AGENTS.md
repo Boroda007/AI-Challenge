@@ -37,7 +37,7 @@ cd day02 && source venv/bin/activate && python app.py
   ```
 - Два параллельных вызова к LLM через `asyncio.gather` + `asyncio.to_thread`
 - Свободный вызов: стандартные параметры
-- Контролируемый вызов: динамическая подстановка `constraints` (max_tokens, temperature, stop, response_format, system_prompt)
+- Контролируемый вызов: динамическая подстановка `constraints` (max_tokens, temperature, stop, response_format, system_prompt). По умолчанию `reasoning_effort: "none"` (рассуждения отключены)
 - `response_format` маппится: `{ text: 'text', json: 'json_object' }` для валидных значений API
 
 ## Важные нюансы

@@ -84,6 +84,7 @@ def call_controlled(history: list[ChatCompletionMessageParam], message: str, con
     api_params: dict = {
         "model": MODEL_NAME,
         "messages": messages,
+        "reasoning_effort": "none",
     }
 
     mapping = {

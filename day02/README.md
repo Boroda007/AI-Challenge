@@ -137,3 +137,4 @@ echo 'MODEL_NAME="your-model-name"' >> .env
 | `stop` | Стоп-символ |
 | `response_format` | `{ "type": "text" }` или `{ "type": "json_object" }` |
 | `system_prompt` | Системный промпт |
+| `reasoning_effort` | Рассуждения отключены (`none` по умолчанию). Допустимые: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
