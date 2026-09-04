@@ -52,7 +52,7 @@ async def ask_ai(text: str = Form(...)):
             model=MODEL_NAME, 
             messages=[{"role": "user", "content": text}]
         )
-        return HTMLResponse(render_markdown(response.choices[0].message.content))
+        return HTMLResponse(render_markdown(response.choices[0].message.content or ""))
         
     except Exception as e:
         return HTMLResponse(f"Ошибка при запросе к ИИ-роутеру: {str(e)}")
