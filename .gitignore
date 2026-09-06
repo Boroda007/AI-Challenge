@@ -1,5 +1,6 @@
 # локальные переменные
 .env
+providers.json
 
 # виртуальное окружение Python
 .venv/

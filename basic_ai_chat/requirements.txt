@@ -1,6 +1,5 @@
 fastapi==0.141.1
 openai==3.7.0
 uvicorn==0.52.4
-python-dotenv==1.2.3
 python-multipart==0.0.32
 markdown==3.10.3

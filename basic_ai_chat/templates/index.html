@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basic AI chat</title>
+    <link rel="stylesheet" href="pico.grey.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <h2>Basic AI chat</h2>
+    </header>
+
+    <div class="app-layout">
+        <!-- Sidebar: параметры -->
+        <aside class="sidebar">
+            <div class="sidebar-header">Параметры</div>
+
+            <div class="setting-row disabled" data-param="response_format">
+                <label for="cb-format">Формат</label>
+                <input type="checkbox" id="cb-format">
+                <select id="sel-format" disabled>
+                    <option value="text">Text</option>
+                    <option value="json">JSON</option>
+                </select>
+            </div>
+
+            <div class="setting-row disabled" data-param="max_tokens">
+                <label for="cb-maxtokens">Длина (токены)</label>
+                <input type="checkbox" id="cb-maxtokens">
+                <input type="range" id="rng-maxtokens" min="5" max="1000" value="50" disabled>
+                <span class="value-display" id="val-maxtokens">50</span>
+            </div>
+
+            <div class="setting-row disabled" data-param="stop">
+                <label for="cb-stop">Стоп-символ</label>
+                <input type="checkbox" id="cb-stop">
+                <input type="text" id="txt-stop" placeholder="например: \n" disabled>
+            </div>
+
+            <div class="setting-row disabled" data-param="temperature">
+                <label for="cb-temp">Температура</label>
+                <input type="checkbox" id="cb-temp">
+                <input type="range" id="rng-temp" min="0" max="2" step="0.1" value="0.7" disabled>
+                <span class="value-display" id="val-temp">0.7</span>
+            </div>
+
+            <div class="setting-row disabled" data-param="reasoning_effort">
+                <label for="cb-reasoning">Reasoning</label>
+                <input type="checkbox" id="cb-reasoning">
+                <select id="sel-reasoning" disabled></select>
+            </div>
+        </aside>
+
+        <!-- Main area -->
+        <main class="main-area">
+            <div class="chats-container" id="chats-container"></div>
+
+            <!-- Bottom panel -->
+            <div class="bottom-area">
+                <div class="bottom-panel">
+                    <div class="panel-header">
+                        <div class="panel-tabs">
+                            <button class="panel-tab active" data-panel="prompt">Системный промпт</button>
+                            <button class="panel-tab" data-panel="chat">Чат</button>
+                        </div>
+                        <div class="free-chat-toggle">
+                            <input type="checkbox" id="cb-free-chat">
+                            <label for="cb-free-chat">Свободный чат</label>
+                        </div>
+                    </div>
+
+                    <div class="panel-view active" data-view="prompt">
+                        <div class="chat-input-container">
+                            <textarea id="txt-sysprompt" rows="1" placeholder="Напишите системный промпт"></textarea>
+                            <button type="button" id="btn-send-prompt" class="icon-btn send-btn" disabled title="Отправить">
+                                <svg viewBox="0 0 24 24" width="24" height="24">
+                                    <path fill="currentColor" d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="panel-view" data-view="chat">
+                        <div class="chat-input-container">
+                            <textarea id="userInput" rows="1" placeholder="Спросите что-нибудь..." maxlength="4000"></textarea>
+                            <button type="button" id="btn-send-chat" class="icon-btn send-btn" disabled title="Отправить">
+                                <svg viewBox="0 0 24 24" width="24" height="24">
+                                    <path fill="currentColor" d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
