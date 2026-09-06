@@ -6,6 +6,7 @@ const btnSendChat = document.getElementById('btn-send-chat');
 const txtSysprompt = document.getElementById('txt-sysprompt');
 const btnSendPrompt = document.getElementById('btn-send-prompt');
 const selReasoning = document.getElementById('sel-reasoning');
+const cbReasoning = document.getElementById('cb-reasoning');
 
 // ===== Раскладка =====
 function updateLayoutVars() {
@@ -64,6 +65,15 @@ function updateReasoningSelect(values) {
         opt.value = v;
         opt.textContent = v;
         selReasoning.appendChild(opt);
+    }
+
+    // Если модель поддерживает "none" — включаем параметр по умолчанию,
+    // чтобы рассуждения были выключены (иначе дефолт провайдера тратит токены)
+    if (values.includes('none')) {
+        selReasoning.value = 'none';
+        cbReasoning.checked = true;
+        if (row) row.classList.remove('disabled');
+        selReasoning.disabled = false;
     }
 }
 

@@ -83,7 +83,7 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
       "content": "...",
       "raw_content": "...",
       "finish_reason": "stop" | null,
-      "applied_params": { "Длина": 50, "Температура": 0.7, "Reasoning": "high", ... },
+      "applied_params": { "Длина": 50, "Температура": 0.7, "Reasoning": "high", "⚠ Сброшен": "reasoning_effort", ... },
       "usage": { "prompt": N, "completion": N, "total": N }
     }
   }
@@ -91,24 +91,25 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
 - Два параллельных вызова к LLM через `asyncio.gather` + `asyncio.to_thread`
 - Свободный вызов: стандартные параметры, без системного промпта
 - Контролируемый вызов: системный промпт из серверного хранилища, динамическая подстановка `constraints` (max_tokens, temperature, stop, response_format, reasoning_effort)
-- `reasoning_effort` передаётся в API только если выбран в UI (иначе не задаётся)
+- Если модель поддерживает `reasoning_effort: "none"` — параметр включён по умолчанию со значением `none` (рассуждения выключены, экономия токенов)
+- `reasoning_effort` со значением `low`/`medium`/`high` передаётся только при ручном выборе в UI
 - `response_format` маппится: `{ text: 'text', json: 'json_object' }` для валидных значений API
+- При ошибке 400 API из-за неподдерживаемого параметра (`reasoning_effort`, `response_format`) — автоматическое удаление и повтор запроса
+- Удалённые параметры отображаются в `applied_params` как `"⚠ Сброшен"`
+
 ## Важные нюансы
 - `providers.json` загружается из директории скрипта при старте
 - `active_provider` / `active_model` определяют текущую конфигурацию
 - `POST /api/switch-model` пересоздаёт OpenAI-клиент и обновляет `providers.json`
 - Импорт типов из `openai.types.chat.ChatCompletionMessageParam` — нужен для type hints в параметрах `messages`
-- Мессенджер-отображение: сообщения пользователя справа, ответы ИИ слева
-- Два варианта отображения ответов: два ответа рядом (свободный + контролируемый) или один ответ на всю ширину (только контролируемый)
-- Sidebar (260px): инженерные параметры (Формат, Длина, Стоп-символ, Температура, Reasoning)
-- Bottom panel: системный промпт (checkbox + textarea) + переключатель свободного чата + поле ввода сообщения
 - Чекбоксы включают/выключают связанные control'ы (disabled-логика)
 - Под ответами ИИ выводится количество токенов (`.token-count`, `completion` only)
 - В правой колонке под ответом выводятся `.param-badge` бейджи (finish_reason, applied_params)
-- Если API возвращает 400 из-за неподдерживаемого параметра (reasoning_effort, response_format), `call_controlled` автоматически удаляет его и повторяет запрос
 
 ## Frontend JS — ключевые функции
 - `loadConfig()` — загрузка конфига с `GET /api/supported-values`, обновление UI (select, sliders)
+- `updateReasoningSelect(values)` — заполнение select для reasoning_effort (скрывает строку если список пуст; если поддерживается `none` — авто-включает чекбокс со значением `none`)
+- `updateSlider(id, valueDisplayId, config)` — установка min/max/step/value для range-слайдеров
 - `addTurn(...)` — рендер строки диалога
 - `addSystemPromptTurn(promptText, rawRequest)` — рендер системного промпта
 - `sendMessage()` — отправка сообщения, вызов `POST /api/chat`
@@ -132,8 +133,10 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
 - `.msg-label` — лейбл автора сообщения
 - `.message`, `.bubble` — сообщения
 - `.ai-responses` — flex-контейнер для двух ответов ИИ
+- `.ai-response-col` — колонка с одним ответом ИИ внутри `.ai-responses`
 - `.ai-responses--single` — один ответ на всю ширину
 - `.params-block`, `.param-badge`, `.param-badge--reason` — бейджи параметров
+- `.params-row` — flex-контейнер для бейджей и счётчика токенов под ответом
 - `.token-count` — счётчик токенов
 - `.free-chat-toggle` — чекбокс свободного чата
 - `.raw-json-toggle` — accordion для JSON

@@ -172,27 +172,25 @@ def call_controlled(history: list[ChatCompletionMessageParam], message: str, con
     dropped_params = []
 
     response = None
-    last_error = None
 
     for attempt in range(len(retry_params) + 1):
         try:
             response = client.chat.completions.create(**api_params)
             break
         except BadRequestError as e:
-            last_error = e
             error_msg = str(e).lower()
-            removed = False
             for param in retry_params:
                 if param in api_params and param in error_msg:
                     del api_params[param]
                     dropped_params.append(param)
-                    removed = True
                     break
-            if not removed:
-                raise
+            else:
+                raise  # ошибка не связана с retry-параметрами — пробрасываем
+            if attempt == len(retry_params):
+                raise  # ретраи исчерпаны
 
-    if response is None:
-        raise last_error
+    if response is None:  # недостижимо, но нужно для статического анализа
+        raise RuntimeError(f"Запрос не удался после сброса параметров: {', '.join(dropped_params)}")
 
     choice = response.choices[0]
 
