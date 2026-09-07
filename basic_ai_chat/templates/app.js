@@ -358,6 +358,7 @@ async function sendMessage() {
                 free_history: freeChatEnabled ? freeChatHistory : [],
                 controlled_history: controlledChatHistory,
                 constraints: collectConstraints(),
+                include_free: freeChatEnabled,
             }),
         });
 
