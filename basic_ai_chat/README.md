@@ -17,6 +17,7 @@
 ```text
 basic_ai_chat/
 ├── AGENTS.md            # Инструкции для AI-агентов
+├── agent.py             # Ядро агента (схемы, промпт, tools, loop)
 ├── app.py               # Бэкенд-сервер на FastAPI и точка входа Python
 ├── providers.json       # Конфигурация провайдеров/моделей (скрыт от Git)
 ├── requirements.txt     # Список зависимостей

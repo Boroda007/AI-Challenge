@@ -10,6 +10,8 @@ from openai import OpenAI, BadRequestError
 from openai.types.chat import ChatCompletionMessageParam
 import markdown
 
+from agent import agent_loop, AgentRequest, get_agent_system_prompt
+
 # Директория скрипта
 current_dir = Path(__file__).resolve().parent
 
@@ -117,42 +119,24 @@ def render_markdown(text: str) -> str:
 
 
 # ── LLM-вызовы ──────────────────────────────────────────────────────────────
-def call_free(history: list[ChatCompletionMessageParam], message: str) -> dict:
-    """Свободный вызов — стандартные параметры, без системного промпта."""
+def call_llm(
+    message: str,
+    history: list[ChatCompletionMessageParam],
+    constraints: dict = {},
+    system_prompt: str | None = None,
+) -> dict:
+    """Ядро LLM-вызова с опциональным системным промптом и constraints."""
     client = _get_client()
     model = _get_model_name()
-    messages: list[ChatCompletionMessageParam] = history + [{"role": "user", "content": message}]
-    response = client.chat.completions.create(model=model, messages=messages)
-    choice = response.choices[0]
-    return {
-        "raw": response.model_dump(),
-        "request_payload": {"model": model, "messages": messages},
-        "content": choice.message.content or "",
-        "finish_reason": choice.finish_reason,
-        "usage": {
-            "prompt": response.usage.prompt_tokens,
-            "completion": response.usage.completion_tokens,
-            "total": response.usage.total_tokens,
-        } if response.usage else None,
-    }
 
-
-def call_controlled(history: list[ChatCompletionMessageParam], message: str, constraints: dict) -> dict:
-    """Контролируемый вызов — с системным промптом и параметрами из constraints."""
-    client = _get_client()
-    model = _get_model_name()
+    # Сборка messages
     messages: list[ChatCompletionMessageParam] = []
-
-    if _current_system_prompt:
-        messages.append({"role": "system", "content": _current_system_prompt})
-
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
     messages.extend(history + [{"role": "user", "content": message}])
 
-    # Собираем параметры API — только из constraints, без хардкода
-    api_params: dict = {
-        "model": model,
-        "messages": messages,
-    }
+    # Сборка API-параметров из constraints
+    api_params: dict = {"model": model, "messages": messages}
 
     mapping = {
         "max_tokens": "max_tokens",
@@ -161,16 +145,24 @@ def call_controlled(history: list[ChatCompletionMessageParam], message: str, con
         "response_format": "response_format",
         "reasoning_effort": "reasoning_effort",
     }
-
     for key, param_name in mapping.items():
         value = constraints.get(key)
         if value is not None:
             api_params[param_name] = value
 
-    # Параметры, которые могут быть отклонены API (в порядке приоритета)
-    retry_params = ["reasoning_effort", "response_format"]
-    dropped_params = []
+    # Если модель поддерживает reasoning_effort: "none" и параметр не задан —
+    # включаем его по умолчанию (рассуждения выключены, экономия токенов,
+    # иначе рассуждающие модели тратят лимит max_tokens на reasoning, оставляя content пустым)
+    supported_reasoning = _active_model_config.get("reasoning_effort", [])
+    if (
+        "none" in supported_reasoning
+        and api_params.get("reasoning_effort") is None
+    ):
+        api_params["reasoning_effort"] = "none"
 
+    # Retry-логика для неподдерживаемых параметров
+    retry_params = ["reasoning_effort", "response_format"]
+    dropped_params: list[str] = []
     response = None
 
     for attempt in range(len(retry_params) + 1):
@@ -194,7 +186,7 @@ def call_controlled(history: list[ChatCompletionMessageParam], message: str, con
 
     choice = response.choices[0]
 
-    # Собираем информацию о применённых параметрах
+    # Сборка applied_params
     applied_params = {}
     if constraints.get("max_tokens") is not None:
         applied_params["Длина"] = constraints["max_tokens"]
@@ -209,8 +201,8 @@ def call_controlled(history: list[ChatCompletionMessageParam], message: str, con
         applied_params["Reasoning"] = constraints["reasoning_effort"]
     if dropped_params:
         applied_params["⚠ Сброшен"] = ", ".join(dropped_params)
-    if _current_system_prompt:
-        applied_params["Системный промпт"] = _current_system_prompt[:30] + "..." if len(_current_system_prompt) > 30 else _current_system_prompt
+    if system_prompt:
+        applied_params["Системный промпт"] = system_prompt[:30] + "..." if len(system_prompt) > 30 else system_prompt
 
     return {
         "raw": response.model_dump(),
@@ -224,6 +216,16 @@ def call_controlled(history: list[ChatCompletionMessageParam], message: str, con
             "total": response.usage.total_tokens,
         } if response.usage else None,
     }
+
+
+def call_free(history: list[ChatCompletionMessageParam], message: str) -> dict:
+    """Свободный вызов — без системного промпта, без constraints."""
+    return call_llm(message, history)
+
+
+def call_controlled(history: list[ChatCompletionMessageParam], message: str, constraints: dict) -> dict:
+    """Контролируемый вызов — с системным промптом и constraints."""
+    return call_llm(message, history, constraints, _current_system_prompt)
 
 
 # ── API-эндпоинты ───────────────────────────────────────────────────────────
@@ -340,6 +342,45 @@ async def api_chat(req: ChatRequest):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.post("/api/agent")
+async def api_agent(req: AgentRequest):
+    """Агентский режим: анализ задачи и выполнение через tools."""
+    try:
+        system_prompt = get_agent_system_prompt(
+            _get_model_name(),
+            _active_model_config,
+        )
+
+        # Отключаем reasoning для агента (экономия токенов)
+        agent_constraints = {}
+        reasoning_values = _active_model_config.get("reasoning_effort", [])
+        if "none" in reasoning_values:
+            agent_constraints["reasoning_effort"] = "none"
+
+        result = await agent_loop(
+            req.message,
+            req.history,
+            call_llm,
+            _active_model_config,
+            system_prompt,
+            agent_constraints,
+        )
+
+        if result.get("content"):
+            result["content"] = render_markdown(result["content"])
+
+        if result.get("results"):
+            for r in result["results"]:
+                resp = r.get("response")
+                if resp and resp.get("content"):
+                    resp["content"] = render_markdown(resp["content"])
+
+        return JSONResponse(result)
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ── Статика ─────────────────────────────────────────────────────────────────
 app.mount("/", StaticFiles(directory=current_dir / "templates"), name="static")
 
@@ -352,4 +393,4 @@ if __name__ == "__main__":
     print(f"🔗 Эндпоинт API: {_active_provider} / {_active_model}")
     print(f"🤖 Модель: {_active_model_config.get('name', _active_model)}")
 
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app:app", host="127.0.0.1", port=8000)

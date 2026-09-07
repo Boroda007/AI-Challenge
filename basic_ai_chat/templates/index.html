@@ -64,6 +64,7 @@
                         <div class="panel-tabs">
                             <button class="panel-tab active" data-panel="prompt">Системный промпт</button>
                             <button class="panel-tab" data-panel="chat">Чат</button>
+                            <button class="panel-tab" data-panel="agent">Агент</button>
                         </div>
                         <div class="free-chat-toggle">
                             <input type="checkbox" id="cb-free-chat">
@@ -92,11 +93,23 @@
                             </button>
                         </div>
                     </div>
+
+                    <div class="panel-view" data-view="agent">
+                        <div class="chat-input-container">
+                            <textarea id="txt-agent" rows="1" placeholder="Опишите задачу для агента..." maxlength="4000"></textarea>
+                            <button type="button" id="btn-send-agent" class="icon-btn send-btn" disabled title="Отправить">
+                                <svg viewBox="0 0 24 24" width="24" height="24">
+                                    <path fill="currentColor" d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
     <script src="app.js"></script>
+    <script src="agent.js"></script>
 </body>
 </html>

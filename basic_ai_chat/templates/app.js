@@ -154,6 +154,54 @@ function buildRawJson(rawApiResponse) {
     return JSON.stringify(rawApiResponse, null, 2);
 }
 
+function renderBadges(finishReason, appliedParams, usage = null) {
+    let html = '<div class="params-row">';
+    let badges = '';
+
+    if (finishReason) {
+        const reasonMap = { stop: 'Стоп-символ', length: 'Длина', content_filter: 'Фильтр' };
+        const reasonLabel = reasonMap[finishReason] || finishReason;
+        badges += `<span class="param-badge param-badge--reason">Причина остановки: ${escapeHtml(reasonLabel)}</span>`;
+    }
+
+    if (appliedParams && typeof appliedParams === 'object') {
+        for (const [name, value] of Object.entries(appliedParams)) {
+            if (value !== null && value !== undefined) {
+                badges += `<span class="param-badge">${escapeHtml(name)}: ${escapeHtml(String(value))}</span>`;
+            }
+        }
+    }
+
+    if (badges) {
+        html += `<div class="params-block">${badges}</div>`;
+    }
+
+    if (usage) {
+        html += `<div class="token-count">${usage.completion} токенов</div>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function renderRawJson(label, data) {
+    if (!data) return '';
+    const rawJson = buildRawJson(data);
+    return `<details class="raw-json-toggle"><summary role="button" class="outline secondary">${label}</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
+}
+
+// Аккордеон под сообщением клиента ≈ ширине пузыря (оба прижаты вправо)
+function fitJsonWidthToBubble(userRow) {
+    const bubble = userRow.querySelector('.message.user .bubble');
+    const details = userRow.querySelector('.raw-json-toggle');
+    if (!bubble || !details) return;
+    const bubbleW = bubble.offsetWidth;
+    const naturalW = details.offsetWidth;
+    if (bubbleW > 0) {
+        details.style.width = Math.max(bubbleW, naturalW) + 'px';
+    }
+}
+
 function addTurn(userText, freeHtml, controlledHtml, finishReason, appliedParams, freeUsage, controlledUsage, showFree, rawFree, rawControlled, rawRequest) {
     // Сообщение пользователя (справа)
     const userRow = document.createElement('div');
@@ -162,114 +210,47 @@ function addTurn(userText, freeHtml, controlledHtml, finishReason, appliedParams
         <div class="msg-label">Вы</div>
         <div class="message user"><div class="bubble">${escapeHtml(userText)}</div></div>
     `;
-    if (rawRequest) {
-        const rawJson = buildRawJson(rawRequest);
-        userContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-запрос</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
-    }
+    userContent += renderRawJson('JSON-запрос', rawRequest);
     userRow.innerHTML = userContent;
     container.appendChild(userRow);
+    fitJsonWidthToBubble(userRow);
 
     // Ответ ИИ (слева)
     const aiRow = document.createElement('div');
     aiRow.className = 'chat-row row-ai';
-
-    let aiContent = ``;
+    let aiContent = '';
 
     if (showFree && freeHtml) {
         // Два ответа рядом
-        aiContent += `<div class="ai-responses">`;
+        aiContent += '<div class="ai-responses">';
 
         // Левая колонка: свободный ответ
-        aiContent += `<div class="ai-response-col">`;
-        aiContent += `<div class="msg-label">ИИ (без ограничений)</div>`;
+        aiContent += '<div class="ai-response-col">';
+        aiContent += '<div class="msg-label">ИИ (без ограничений)</div>';
         aiContent += `<div class="message ai"><div class="bubble">${freeHtml}</div></div>`;
-        if (freeUsage) {
-            aiContent += `<div class="params-row"><div class="token-count">${freeUsage.completion} токенов</div></div>`;
-        }
-        if (rawFree !== null && rawFree !== undefined) {
-            const rawJson = buildRawJson(rawFree);
-            aiContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
-        }
-        aiContent += `</div>`;
+        aiContent += renderBadges(null, null, freeUsage);
+        aiContent += renderRawJson('JSON-ответ', rawFree);
+        aiContent += '</div>';
 
         // Правая колонка: контролируемый ответ
-        aiContent += `<div class="ai-response-col">`;
-        aiContent += `<div class="msg-label">ИИ</div>`;
+        aiContent += '<div class="ai-response-col">';
+        aiContent += '<div class="msg-label">ИИ</div>';
         aiContent += `<div class="message ai"><div class="bubble">${controlledHtml}</div></div>`;
+        aiContent += renderBadges(finishReason, appliedParams, controlledUsage);
+        aiContent += renderRawJson('JSON-ответ', rawControlled);
+        aiContent += '</div>';
 
-        // Бейджи + токены в одну строку
-        aiContent += `<div class="params-row">`;
-
-        let badges = '';
-        if (finishReason) {
-            const reasonMap = { stop: 'Стоп-символ', length: 'Длина', content_filter: 'Фильтр' };
-            const reasonLabel = reasonMap[finishReason] || finishReason;
-            badges += `<span class="param-badge param-badge--reason">Причина остановки: ${escapeHtml(reasonLabel)}</span>`;
-        }
-        if (appliedParams && typeof appliedParams === 'object') {
-            for (const [name, value] of Object.entries(appliedParams)) {
-                if (value !== null && value !== undefined) {
-                    badges += `<span class="param-badge">${escapeHtml(name)}: ${escapeHtml(String(value))}</span>`;
-                }
-            }
-        }
-        if (badges) {
-            aiContent += `<div class="params-block">${badges}</div>`;
-        }
-
-        if (controlledUsage) {
-            aiContent += `<div class="token-count">${controlledUsage.completion} токенов</div>`;
-        }
-
-        aiContent += `</div>`; // params-row
-
-        if (rawControlled !== null && rawControlled !== undefined) {
-            const rawJson = buildRawJson(rawControlled);
-            aiContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
-        }
-
-        aiContent += `</div>`; // ai-response-col
-        aiContent += `</div>`; // ai-responses
+        aiContent += '</div>'; // ai-responses
     } else {
         // Один ответ на всю ширину
-        aiContent += `<div class="ai-responses ai-responses--single">`;
-        aiContent += `<div class="ai-response-col">`;
-        aiContent += `<div class="msg-label">ИИ</div>`;
+        aiContent += '<div class="ai-responses ai-responses--single">';
+        aiContent += '<div class="ai-response-col">';
+        aiContent += '<div class="msg-label">ИИ</div>';
         aiContent += `<div class="message ai"><div class="bubble">${controlledHtml}</div></div>`;
-
-        // Бейджи + токены в одну строку
-        aiContent += `<div class="params-row">`;
-
-        let badges = '';
-        if (finishReason) {
-            const reasonMap = { stop: 'Стоп-символ', length: 'Длина', content_filter: 'Фильтр' };
-            const reasonLabel = reasonMap[finishReason] || finishReason;
-            badges += `<span class="param-badge param-badge--reason">Причина остановки: ${escapeHtml(reasonLabel)}</span>`;
-        }
-        if (appliedParams && typeof appliedParams === 'object') {
-            for (const [name, value] of Object.entries(appliedParams)) {
-                if (value !== null && value !== undefined) {
-                    badges += `<span class="param-badge">${escapeHtml(name)}: ${escapeHtml(String(value))}</span>`;
-                }
-            }
-        }
-        if (badges) {
-            aiContent += `<div class="params-block">${badges}</div>`;
-        }
-
-        if (controlledUsage) {
-            aiContent += `<div class="token-count">${controlledUsage.completion} токенов</div>`;
-        }
-
-        aiContent += `</div>`; // params-row
-
-        if (rawControlled !== null && rawControlled !== undefined) {
-            const rawJson = buildRawJson(rawControlled);
-            aiContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
-        }
-
-        aiContent += `</div>`; // ai-response-col
-        aiContent += `</div>`; // ai-responses
+        aiContent += renderBadges(finishReason, appliedParams, controlledUsage);
+        aiContent += renderRawJson('JSON-ответ', rawControlled);
+        aiContent += '</div>';
+        aiContent += '</div>';
     }
 
     aiRow.innerHTML = aiContent;
@@ -286,12 +267,10 @@ function addSystemPromptTurn(promptText, rawRequest) {
         <div class="msg-label">Системный промпт</div>
         <div class="message user"><div class="bubble">${escapeHtml(promptText)}</div></div>
     `;
-    if (rawRequest) {
-        const rawJson = buildRawJson(rawRequest);
-        content += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-запрос</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
-    }
+    content += renderRawJson('JSON-запрос', rawRequest);
     row.innerHTML = content;
     container.appendChild(row);
+    fitJsonWidthToBubble(row);
     scrollToBottom();
 }
 

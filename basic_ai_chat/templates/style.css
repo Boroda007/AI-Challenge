@@ -153,6 +153,10 @@ body {
     padding-left: 12px;
 }
 
+.chat-row.row-ai > .msg-label {
+    padding-left: 12px;
+}
+
 /* ===== Контейнер ответов ИИ ===== */
 .ai-responses {
     display: flex;
@@ -168,6 +172,15 @@ body {
 }
 
 .ai-responses--single .ai-response-col { max-width: 100%; }
+
+/* Граф сравнения: колонки не растягиваются на высоту соседа,
+   чипы-параметры не вытягиваются по вертикали */
+.ai-responses--graph { align-items: flex-start; }
+.ai-responses--graph .ai-response-col > .params-block {
+    flex: 0 1 auto;
+    align-items: flex-start;
+    padding-left: 12px;
+}
 
 /* ===== Сообщения ===== */
 .message { display: flex; }
@@ -366,6 +379,8 @@ body {
 .raw-json-toggle {
     margin-top: 8px;
     font-size: 12px;
+    width: 100%;
+    min-width: 0;
 }
 
 .raw-json-toggle summary {
@@ -385,6 +400,77 @@ body {
     overflow: auto;
     background: var(--pico-code-background-color);
     border-radius: 4px;
-    word-break: break-word;
+    overflow-wrap: anywhere;
     white-space: pre-wrap;
+}
+
+/* ===== Agent steps ===== */
+.agent-steps-toggle {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.agent-steps-toggle summary {
+    font-size: 12px;
+    color: #888;
+    cursor: pointer;
+    padding: 4px 0;
+    user-select: none;
+}
+
+.agent-steps-toggle summary:hover {
+    color: #555;
+}
+
+.agent-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.agent-step {
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.agent-step--thinking { color: #666; font-style: italic; }
+.agent-step--tool_call { color: #0066cc; background: #f0f6ff; }
+.agent-step--tool_result { color: #333; background: #f5f5f5; }
+.agent-step--clarification { color: #cc6600; background: #fff6f0; }
+.agent-step--answer { color: #333; }
+
+.tool-result {
+    font-size: 12px;
+    background: #f5f5f5;
+    padding: 6px 8px;
+    border-radius: 4px;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    max-height: 150px;
+    overflow: auto;
+    margin-top: 4px;
+}
+
+.agent-step-row pre.tool-result {
+    margin: 4px 0 0;
+    font-size: 12px;
+    background: #f5f5f5;
+    padding: 6px 8px;
+    border-radius: 4px;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    max-height: 150px;
+    overflow: auto;
+}
+
+.agent-step-row {
+    opacity: 0.9;
 }
