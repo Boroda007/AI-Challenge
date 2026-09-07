@@ -66,7 +66,6 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
 - `GET /api/providers` — список всех провайдеров и моделей из `providers.json`
 - `GET /api/supported-values` — capabilities активной модели (reasoning_effort, temperature, max_tokens)
 - `POST /api/switch-model` — смена провайдера/модели: `{ "provider": "...", "model": "..." }`, пересоздание OpenAI-клиента
-- `POST /api/system-prompt` — принимает `{ "prompt": "..." }`, сохраняет системный промпт на сервере
 - `POST /api/chat` — принимает JSON (`ChatRequest`), возвращает:
   ```json
   {
@@ -90,7 +89,7 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
   ```
 - Два параллельных вызова к LLM через `asyncio.gather` + `asyncio.to_thread`
 - Свободный вызов: стандартные параметры, без системного промпта
-- Контролируемый вызов: системный промпт из серверного хранилища, динамическая подстановка `constraints` (max_tokens, temperature, stop, response_format, reasoning_effort)
+- Контролируемый вызов: системный промпт из контролируемой истории (роль system), динамическая подстановка `constraints` (max_tokens, temperature, stop, response_format, reasoning_effort)
 - Если модель поддерживает `reasoning_effort: "none"` — параметр включён по умолчанию со значением `none` (рассуждения выключены, экономия токенов)
 - `reasoning_effort` со значением `low`/`medium`/`high` передаётся только при ручном выборе в UI
 - `response_format` маппится: `{ text: 'text', json: 'json_object' }` для валидных значений API
@@ -111,7 +110,7 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
 - `updateReasoningSelect(values)` — заполнение select для reasoning_effort (скрывает строку если список пуст; если поддерживается `none` — авто-включает чекбокс со значением `none`)
 - `updateSlider(id, valueDisplayId, config)` — установка min/max/step/value для range-слайдеров
 - `addTurn(...)` — рендер строки диалога
-- `addSystemPromptTurn(promptText, rawRequest)` — рендер системного промпта
+- `addSystemPromptTurn(promptText)` — рендер системного промпта
 - `sendMessage()` — отправка сообщения, вызов `POST /api/chat`
 - `collectConstraints()` — сбор данных с панели настроек (включая reasoning_effort)
 - `escapeHtml(s)` — XSS-защита

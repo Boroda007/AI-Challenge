@@ -130,18 +130,14 @@ txtSysprompt.addEventListener('input', () => {
 });
 
 // ===== Отправка системного промпта =====
-btnSendPrompt.addEventListener('click', async () => {
+btnSendPrompt.addEventListener('click', () => {
     const prompt = txtSysprompt.value.trim();
     if (!prompt) return;
 
-    const resp = await fetch('/api/system-prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-    });
-    const rawRequest = await resp.json();
+    // Добавляем промпт как обычное сообщение в конец истории
+    controlledChatHistory.push({ role: 'system', content: prompt });
 
-    addSystemPromptTurn(prompt, rawRequest);
+    addSystemPromptTurn(prompt);
 
     btnSendPrompt.style.opacity = '0.5';
     btnSendPrompt.disabled = true;

@@ -87,9 +87,6 @@ app = FastAPI()
 _load_providers_config()
 _resolve_active_model()
 
-# Хранилище системного промпта
-_current_system_prompt: str = ""
-
 
 # ── Pydantic-схемы ──────────────────────────────────────────────────────────
 class ChatRequest(BaseModel):
@@ -97,10 +94,6 @@ class ChatRequest(BaseModel):
     free_history: list[ChatCompletionMessageParam] = []
     controlled_history: list[ChatCompletionMessageParam] = []
     constraints: dict = {}
-
-
-class SystemPromptRequest(BaseModel):
-    prompt: str
 
 
 class SwitchModelRequest(BaseModel):
@@ -141,12 +134,7 @@ def call_controlled(history: list[ChatCompletionMessageParam], message: str, con
     """Контролируемый вызов — с системным промптом и параметрами из constraints."""
     client = _get_client()
     model = _get_model_name()
-    messages: list[ChatCompletionMessageParam] = []
-
-    if _current_system_prompt:
-        messages.append({"role": "system", "content": _current_system_prompt})
-
-    messages.extend(history + [{"role": "user", "content": message}])
+    messages: list[ChatCompletionMessageParam] = list(history) + [{"role": "user", "content": message}]
 
     # Собираем параметры API — только из constraints, без хардкода
     api_params: dict = {
@@ -209,8 +197,6 @@ def call_controlled(history: list[ChatCompletionMessageParam], message: str, con
         applied_params["Reasoning"] = constraints["reasoning_effort"]
     if dropped_params:
         applied_params["⚠ Сброшен"] = ", ".join(dropped_params)
-    if _current_system_prompt:
-        applied_params["Системный промпт"] = _current_system_prompt[:30] + "..." if len(_current_system_prompt) > 30 else _current_system_prompt
 
     return {
         "raw": response.model_dump(),
@@ -292,16 +278,6 @@ async def switch_model(req: SwitchModelRequest):
             "temperature": _active_model_config.get("temperature", {}),
             "max_tokens": _active_model_config.get("max_tokens", {}),
         },
-    })
-
-
-@app.post("/api/system-prompt")
-async def set_system_prompt(req: SystemPromptRequest):
-    global _current_system_prompt
-    _current_system_prompt = req.prompt
-    return JSONResponse({
-        "model": _get_model_name(),
-        "messages": [{"role": "system", "content": _current_system_prompt}],
     })
 
 
