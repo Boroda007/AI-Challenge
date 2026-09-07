@@ -85,7 +85,7 @@ function updateSlider(sliderId, displayId, config) {
 
     slider.min = config.min;
     slider.max = config.max;
-    slider.step = config.step || 0.1;
+    slider.step = config.step !== undefined ? config.step : 1;
     slider.value = config.default;
     if (display) display.textContent = config.default;
 }
