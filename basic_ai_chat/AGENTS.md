@@ -1,65 +1,27 @@
 # AGENTS.md — Basic AI chat
 
-## Запуск
+## Running
 ```
 cd basic_ai_chat && source venv/bin/activate && python app.py
 ```
-Сервер: http://127.0.0.1:8000
+Server: http://127.0.0.1:8000
 
-## Конфигурация (providers.json)
-Единый источник конфигурации — `providers.json` в корне проекта.
-- Содержит список провайдеров, моделей и их capabilities
-- Содержит API-ключи (файл добавлен в `.gitignore`)
-- `active_provider` / `active_model` — текущий выбор
-- `.env` больше не используется
+## Technology Stack
 
-## Архитектура
-- Бэкенд: FastAPI (`app.py`), OpenAI SDK для запросов к LLM
-- Фронтенд: vanilla HTML/JS
-  - `templates/index.html` — разметка
-  - `templates/pico.grey.min.css` — Pico CSS v2 (grey theme, classless)
-  - `templates/style.css` — кастомные стили (базовые стили delegated Pico)
-  - `templates/app.js` — логика (вынесена из HTML)
-- Статика раздаётся через `StaticFiles(directory=templates)`
-- Pydantic-схема `ChatRequest`: `message`, `free_history`, `controlled_history`, `constraints`
-- История хранится только на фронте (JS-массивы `freeChatHistory` / `controlledChatHistory`)
-- Мессенджер-отображение: сообщения пользователя справа, ответы ИИ слева
-- Два варианта отображения ответов: два ответа рядом (свободный + контролируемый) или один ответ на всю ширину (только контролируемый)
-- Sidebar (260px): инженерные параметры (Формат, Длина, Стоп-символ, Температура, Reasoning)
-- Bottom panel: системный промпт (checkbox + textarea) + переключатель свободного чата + поле ввода сообщения
+### Backend
+- **FastAPI** (`app.py`) — веб-фреймворк на Python для асинхронных запросов к LLM
+- **OpenAI SDK** — отправка запросов к OpenAI-compatible API endpoint
 
-## providers.json — структура
-```json
-{
-  "active_provider": "ollama",
-  "active_model": "qwen2.5:3b",
-  "providers": {
-    "ollama": {
-      "name": "Ollama (localhost)",
-      "base_url": "http://localhost:11434/v1",
-      "api_key": "",
-      "models": [
-        {
-          "id": "qwen2.5:3b",
-          "name": "Qwen 2.5 3B",
-          "reasoning_effort": [],
-          "temperature": { "min": 0, "max": 2, "step": 0.1, "default": 0.7 },
-          "max_tokens": { "min": 5, "max": 4096, "default": 150 }
-        }
-      ]
-    }
-  }
-}
-```
+### Frontend
+- **Vanilla JavaScript** — клиентская логика в отдельном файле `app.js`
+- **HTML5 templates** — разметка интерфейса
 
-### Поля модели
-| Поле | Описание |
-|------|----------|
-| `id` | Идентификатор модели для API |
-| `name` | Человекочитаемое название |
-| `reasoning_effort` | Список поддерживаемых значений (пустой = параметр не поддерживается) |
-| `temperature` | `{ min, max, step, default }` — диапазон и значения по умолчанию |
-| `max_tokens` | `{ min, max, default }` — диапазон и значение по умолчанию |
+### Styling
+- **Pico CSS v2 (grey theme)** — базовые стили с classless подходом
+- **Custom styles** (`style.css`) — кастомные стили, делегированные от Pico
+
+> См. подробную документацию в [README.md](./README.md)
+
 
 ## API
 - `GET /` — отдаёт HTML-страницу
@@ -96,7 +58,7 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
 - При ошибке 400 API из-за неподдерживаемого параметра (`reasoning_effort`, `response_format`) — автоматическое удаление и повтор запроса
 - Удалённые параметры отображаются в `applied_params` как `"⚠ Сброшен"`
 
-## Важные нюансы
+## Important Notes
 - `providers.json` загружается из директории скрипта при старте
 - `active_provider` / `active_model` определяют текущую конфигурацию
 - `POST /api/switch-model` пересоздаёт OpenAI-клиент и обновляет `providers.json`
@@ -113,54 +75,28 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
 - `addSystemPromptTurn(promptText)` — рендер системного промпта
 - `sendMessage()` — отправка сообщения, вызов `POST /api/chat`
 - `collectConstraints()` — сбор данных с панели настроек (включая reasoning_effort)
-- `escapeHtml(s)` — XSS-защита
-- `freeChatEnabled` — флаг свободного чата (по умолчанию `false`)
-- Логика чекбоксов: `querySelectorAll('.setting-row[data-param]')` + обработчик `change`
 
-## CSS-классы
-- `.app-layout` — Grid-контейнер основной раскладки (sidebar + main)
-- `.sidebar` — левая панель (260px, параметры)
-- `.sidebar-header` — заголовок sidebar
-- `.main-area` — правая область (flex-column)
-- `.bottom-area` — фиксированная обёртка нижней панели
-- `.bottom-panel` — визуальная панель (промпт + ввод)
-- `.setting-row` — строка параметра (flex-wrap, label сверху, checkbox+control снизу)
-- `.chats-container` — flex-column контейнер чата
-- `.chat-row` — flex-column обёртка строки диалога
-- `.chat-row.row-user` — выравнивание вправо
-- `.chat-row.row-ai` — выравнивание влево
-- `.msg-label` — лейбл автора сообщения
-- `.message`, `.bubble` — сообщения
-- `.ai-responses` — flex-контейнер для двух ответов ИИ
-- `.ai-response-col` — колонка с одним ответом ИИ внутри `.ai-responses`
-- `.ai-responses--single` — один ответ на всю ширину
-- `.params-block`, `.param-badge`, `.param-badge--reason` — бейджи параметров
-- `.params-row` — flex-контейнер для бейджей и счётчика токенов под ответом
-- `.token-count` — счётчик токенов
-- `.free-chat-toggle` — чекбокс свободного чата
-- `.raw-json-toggle` — accordion для JSON
+## Commit Message Conventions
 
-## Правила оформления коммитов
-
-**Формат:**
+**Format:**
 ```
-<type>(<scope>): <описание на русском>
+<type>(<scope>): <description in Russian>
 ```
 
-**Типы (type):**
-| Тег | Когда использовать |
-|-----|-------------------|
-| `feat` | Новая функциональность |
-| `fix` | Исправление бага |
-| `refactor` | Рефакторинг без изменения поведения |
-| `docs` | Только документация |
-| `style` | CSS, форматирование, визуальные изменения |
-| `test` | Тесты |
-| `chore` | Сборка, зависимости, техническая работа |
+**Types (type):**
+| Tag | When to use |
+|-----|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `refactor` | Refactoring without behavior change |
+| `docs` | Documentation only |
+| `style` | CSS, formatting, visual |
+| `test` | Tests |
+| `chore` | Build, dependencies, technical work |
 
-**Скоуп (scope)** — опционален, кратко на английском: `chat`, `backend`, `frontend`, `types`, `ui`, `config`.
+**Scope (scope)** — optional, briefly in English: `chat`, `backend`, `frontend`, `types`, `ui`, `config`.
 
-**Примеры:**
+**Examples:**
 ```
 feat(config): добавить providers.json с провайдерами и моделями
 feat(chat): добавить reasoning_effort в панель параметров
