@@ -3,11 +3,8 @@
 ## 📦 Packaged
 - [ ] #005 Refactoring: move endpoints from app.py to routers/ (steps #005.4–#005.8)
 
-## 🔬 Lab Work
-- [ ] #005.5 Step 5 — create services/llm.py (call_free, call_controlled, render_markdown)
-- [ ] #005.6 Step 6 — create routers/chat.py (POST /api/chat)
+## 🎯 In Progress
 - [ ] #005.7 Step 7 — create routers/pages.py (GET /)
-- [ ] #005.8 Step 8 — final check of all endpoints
 - [ ] #005.8 Step 8 — final check of all endpoints
 
 ## ✅ Выполнено (Done)
@@ -20,6 +17,8 @@
 - [x] #005.2.4 Проверка: import app OK + curl /, /api/providers, /api/supported-values — всё работает
 - [x] #005.3 Шаг 3 — обновить routers/providers.py (прямой import state, перенести /api/supported-values)
 - [x] #005.4 Step 4 — create routers/models.py (POST /api/switch-model)
+- [x] #005.6 Step 6 — create routers/chat.py (POST /api/chat)
+- [x] #005.6.1 Устранить дублирование switch-model: удалить routers/models.py
 - [x] #006 reasoning_effort из models.json вместо providers.json
 
 ## ⚠️ Блокеры и вопросы (Blockers)
