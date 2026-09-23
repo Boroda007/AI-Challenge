@@ -56,7 +56,6 @@ basic_ai_chat/
         {
           "id": "qwen2.5:3b",
           "name": "Qwen 2.5 3B",
-          "reasoning_effort": [],
           "temperature": { "min": 0, "max": 2, "step": 0.1, "default": 0.7 },
           "max_tokens": { "min": 5, "max": 4096, "default": 150 }
         }
@@ -71,9 +70,10 @@ basic_ai_chat/
 |------|----------|
 | `id` | Идентификатор модели для API |
 | `name` | Человекочитаемое название |
-| `reasoning_effort` | Список поддерживаемых значений (пустой = параметр не поддерживается) |
 | `temperature` | `{ min, max, step, default }` — диапазон и значения по умолчанию |
 | `max_tokens` | `{ min, max, default }` — диапазон и значение по умолчанию |
+
+> Уровни `reasoning_effort` хранятся не здесь, а в реестре моделей **`models.json`** (см. `docs/models.md`).
 
 Ключи верхнего уровня `active_provider` и `active_model` определяют текущую модель. Их можно менять через API (`POST /api/switch-model`) — сервер пересоздаст OpenAI-клиент и обновит файл.
 
@@ -125,7 +125,7 @@ python app.py
 ```
 
 ### `GET /api/supported-values`
-Возвращает capabilities активной модели (reasoning_effort, temperature, max_tokens) для настройки UI:
+Возвращает capabilities активной модели для настройки UI: `reasoning_effort` — из `models.json` (пустой список = не поддерживается), `temperature` и `max_tokens` — из `providers.json`:
 ```json
 {
   "reasoning_effort": [],
