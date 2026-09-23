@@ -1,9 +1,9 @@
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 import state
 from routers.chat import router as chat_router
+from routers.pages import router as pages_router
 from routers.providers import router as providers_router
 from state import current_dir
 
@@ -15,15 +15,9 @@ state._resolve_active_model()
 
 app.include_router(providers_router)
 app.include_router(chat_router)
+app.include_router(pages_router)
 
 
-
-
-# ── API-эндпоинты ───────────────────────────────────────────────────────────
-@app.get("/")
-async def home():
-    html_path = current_dir / "templates" / "index.html"
-    return FileResponse(html_path)
 
 
 # ── Статика ─────────────────────────────────────────────────────────────────

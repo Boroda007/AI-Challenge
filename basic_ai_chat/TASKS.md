@@ -4,8 +4,6 @@
 - [ ] #005 Refactoring: move endpoints from app.py to routers/ (steps #005.4–#005.8)
 
 ## 🎯 In Progress
-- [ ] #005.7 Step 7 — create routers/pages.py (GET /)
-- [ ] #005.8 Step 8 — final check of all endpoints
 
 ## ✅ Выполнено (Done)
 - [x] #005.1 Шаг 1 — создать state.py (глобалы + load/save/resolve)
@@ -19,6 +17,8 @@
 - [x] #005.4 Step 4 — create routers/models.py (POST /api/switch-model)
 - [x] #005.6 Step 6 — create routers/chat.py (POST /api/chat)
 - [x] #005.6.1 Устранить дублирование switch-model: удалить routers/models.py
+- [x] #005.7 Step 7 — create routers/pages.py (GET /)
+- [x] #005.8 Step 8 — final check of all endpoints
 - [x] #006 reasoning_effort из models.json вместо providers.json
 
 ## ⚠️ Блокеры и вопросы (Blockers)
