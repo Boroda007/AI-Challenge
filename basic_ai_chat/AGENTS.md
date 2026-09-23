@@ -6,6 +6,11 @@ cd basic_ai_chat && source venv/bin/activate && python app.py
 ```
 Server: http://127.0.0.1:8000
 
+## Tests
+```
+cd basic_ai_chat && source venv/bin/activate && python -m unittest discover -s tests -v
+```
+
 ## Tech Stack
 
 ### Backend

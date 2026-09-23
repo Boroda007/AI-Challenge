@@ -20,6 +20,7 @@
 - [x] #005.6.1 Устранить дублирование switch-model: удалить routers/models.py
 - [x] #005.7 Step 7 — create routers/pages.py (GET /)
 - [x] #005.8 Step 8 — final check of all endpoints
+- [x] #007 Создать автоматические тесты для проверки изменений агентами
 - [x] #006 reasoning_effort из models.json вместо providers.json
 
 ## ⚠️ Блокеры и вопросы (Blockers)
