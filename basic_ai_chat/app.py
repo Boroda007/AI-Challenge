@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 import reasoning
 import state
+from routers.models import router as models_router
 from routers.providers import router as providers_router
 from state import _get_client, _get_model_name, current_dir
 
@@ -20,6 +21,7 @@ state._load_providers_config()
 state._resolve_active_model()
 
 app.include_router(providers_router)
+app.include_router(models_router)
 
 
 # ── Pydantic-схемы ──────────────────────────────────────────────────────────
