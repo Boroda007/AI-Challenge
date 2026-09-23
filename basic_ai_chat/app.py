@@ -4,11 +4,10 @@ import markdown
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from openai import BadRequestError, OpenAI, OpenAIError
+from openai import BadRequestError, OpenAIError
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
-import reasoning
 import state
 from routers.models import router as models_router
 from routers.providers import router as providers_router
@@ -31,11 +30,6 @@ class ChatRequest(BaseModel):
     controlled_history: list[ChatCompletionMessageParam] = []
     constraints: dict = {}
     include_free: bool = True
-
-
-class SwitchModelRequest(BaseModel):
-    provider: str
-    model: str
 
 
 # ── Утилиты ─────────────────────────────────────────────────────────────────
@@ -174,49 +168,6 @@ def call_controlled(
 async def home():
     html_path = current_dir / "templates" / "index.html"
     return FileResponse(html_path)
-
-
-@app.post("/api/switch-model")
-async def switch_model(req: SwitchModelRequest):
-    """Смена провайдера/модели без перезапуска сервера."""
-    if req.provider not in state._providers_config:
-        return JSONResponse(
-            {"error": f"Провайдер '{req.provider}' не найден"}, status_code=400
-        )
-
-    provider = state._providers_config[req.provider]
-    model_config = None
-    for m in provider.get("models", []):
-        if m["id"] == req.model:
-            model_config = m
-            break
-
-    if model_config is None:
-        return JSONResponse(
-            {"error": f"Модель '{req.model}' не найдена у провайдера '{req.provider}'"},
-            status_code=400,
-        )
-
-    state._active_provider = req.provider
-    state._active_model = req.model
-    state._active_model_config = model_config
-    state._client = OpenAI(
-        base_url=provider["base_url"], api_key=provider.get("api_key", "") or "none"
-    )
-
-    state._save_providers_config()
-
-    return JSONResponse(
-        {
-            "provider": state._active_provider,
-            "model": state._active_model,
-            "supported_values": {
-                "reasoning_effort": reasoning.effort_levels(state._active_model),
-                "temperature": state._active_model_config.get("temperature", {}),
-                "max_tokens": state._active_model_config.get("max_tokens", {}),
-            },
-        }
-    )
 
 
 @app.post("/api/chat")
