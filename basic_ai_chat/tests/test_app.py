@@ -7,11 +7,12 @@ from fastapi.testclient import TestClient
 import state
 from app import app
 from routers import chat
-from services import llm
+from services import history, llm
 
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
+        history.clear_history()
         self.client = TestClient(app)
         state._providers_config = {
             "test": {
@@ -36,7 +37,14 @@ class ApiTests(unittest.TestCase):
         paths = app.openapi()["paths"]
         self.assertEqual(
             set(paths),
-            {"/", "/api/chat", "/api/switch-model", "/api/providers", "/api/supported-values"},
+            {
+                "/",
+                "/api/chat",
+                "/api/system-prompt",
+                "/api/switch-model",
+                "/api/providers",
+                "/api/supported-values",
+            },
         )
         self.assertNotIn("/switch-model", paths)
 
@@ -57,6 +65,24 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_system_prompt_appends_to_server_history(self):
+        response = self.client.post(
+            "/api/system-prompt", json={"content": "  Follow the rules.  "}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"content": "Follow the rules."})
+        self.assertEqual(
+            history.get_history(),
+            [{"role": "system", "content": "Follow the rules."}],
+        )
+
+    def test_system_prompt_rejects_empty_content(self):
+        response = self.client.post("/api/system-prompt", json={"content": " "})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(history.get_history(), [])
+
     def test_chat_uses_single_controlled_service(self):
         controlled_result = {
             "raw": {"id": "response-id"},
@@ -66,7 +92,7 @@ class ApiTests(unittest.TestCase):
             "applied_params": {"Длина": 20},
             "usage": {"total": 3},
         }
-        history = [{"role": "user", "content": "old"}]
+        prior_history = [{"role": "user", "content": "old"}]
         constraints = {"max_tokens": 20}
         with patch.object(
             chat, "call_controlled", return_value=controlled_result
@@ -75,7 +101,7 @@ class ApiTests(unittest.TestCase):
                 "/api/chat",
                 json={
                     "message": "hello",
-                    "conversation_history": history,
+                    "conversation_history": prior_history,
                     "constraints": constraints,
                 },
             )
@@ -95,7 +121,14 @@ class ApiTests(unittest.TestCase):
         )
         self.assertNotIn("free_response", response.json())
         self.assertNotIn("controlled_response", response.json())
-        controlled_call.assert_called_once_with(history, "hello", constraints)
+        controlled_call.assert_called_once_with([], "hello", constraints)
+        self.assertEqual(
+            history.get_history(),
+            [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "controlled"},
+            ],
+        )
 
 
 class LlmServiceTests(unittest.TestCase):
@@ -122,6 +155,40 @@ class LlmServiceTests(unittest.TestCase):
 
     def test_render_markdown(self):
         self.assertEqual(llm.render_markdown("# title"), "<h1>title</h1>")
+
+
+class HistoryServiceTests(unittest.TestCase):
+    def setUp(self):
+        history.clear_history()
+
+    def tearDown(self):
+        history.clear_history()
+
+    def test_history_appends_and_loads_messages(self):
+        history.append_message("system", "instructions")
+        history.append_turn("question", "answer")
+
+        self.assertEqual(
+            history.get_history(),
+            [
+                {"role": "system", "content": "instructions"},
+                {"role": "user", "content": "question"},
+                {"role": "assistant", "content": "answer"},
+            ],
+        )
+
+    def test_get_history_returns_copy(self):
+        history.append_message("user", "question")
+        loaded = history.get_history()
+        loaded.append({"role": "assistant", "content": "external"})
+
+        self.assertEqual(len(history.get_history()), 1)
+
+    def test_clear_history_removes_all_messages(self):
+        history.append_message("user", "question")
+        history.clear_history()
+
+        self.assertEqual(history.get_history(), [])
 
 
 if __name__ == "__main__":

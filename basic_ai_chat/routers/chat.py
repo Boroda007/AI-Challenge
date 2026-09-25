@@ -1,20 +1,36 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from openai import OpenAIError
+from pydantic import BaseModel
 
+from services import history
 from services.llm import ChatRequest, call_controlled, render_markdown
 
 router = APIRouter()
+
+
+class SystemPromptRequest(BaseModel):
+    content: str
+
+
+@router.post("/api/system-prompt")
+async def api_system_prompt(req: SystemPromptRequest):
+    content = req.content.strip()
+    if not content:
+        return JSONResponse({"error": "System prompt cannot be empty"}, status_code=400)
+    history.append_message("system", content)
+    return JSONResponse({"content": content})
 
 
 @router.post("/api/chat")
 async def api_chat(req: ChatRequest):
     try:
         result = call_controlled(
-            req.conversation_history,
+            history.get_history(),
             req.message,
             req.constraints,
         )
+        history.append_turn(req.message, result["content"])
 
         return JSONResponse(
             {

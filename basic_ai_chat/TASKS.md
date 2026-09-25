@@ -1,13 +1,15 @@
 # Project Tasks
 
 ## To Do
-- [ ] #016 Add server-side chat history storage
-  - Choose JSONL or SQLite and define the conversation format.
-  - Implement saving and loading history through the API.
-  - Connect history loading and synchronization to the UI.
-  - Add tests for saving, loading, and error handling.
 
 ## Completed
+- [x] #016 Add server-side in-memory chat history
+  - Add the in-memory history service and unit tests.
+  - Use server history in `/api/chat` and append successful turns.
+  - Add the system-prompt endpoint and API tests.
+  - Remove client-owned history from the chat request and state.
+  - Update README and architecture documentation.
+  - Run the complete test suite and inspect the final diff.
 - [x] #015 Remove parallel free/controlled chat flows
   - Use one controlled invocation, one API response, and one client history.
   - Remove free-mode fields, response, service function, and UI toggle.

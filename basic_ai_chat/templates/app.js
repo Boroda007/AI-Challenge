@@ -15,9 +15,6 @@ function updateLayoutVars() {
     if (bottomPanel) document.documentElement.style.setProperty('--bottom-h', bottomPanel.offsetHeight + 'px');
 }
 
-// ===== История =====
-const conversationHistory = [];
-
 // ===== Утилиты =====
 function escapeHtml(s) {
     return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -122,18 +119,28 @@ txtSysprompt.addEventListener('input', () => {
 });
 
 // ===== Отправка системного промпта =====
-btnSendPrompt.addEventListener('click', () => {
+btnSendPrompt.addEventListener('click', async () => {
     const prompt = txtSysprompt.value.trim();
     if (!prompt) return;
 
-    // Добавляем промпт как обычное сообщение в конец истории
-    conversationHistory.push({ role: 'system', content: prompt });
-
-    addSystemPromptTurn(prompt);
-
-    btnSendPrompt.style.opacity = '0.5';
     btnSendPrompt.disabled = true;
-    setTimeout(() => { btnSendPrompt.style.opacity = ''; btnSendPrompt.disabled = false; }, 1500);
+    try {
+        const resp = await fetch('/api/system-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: prompt }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.error) {
+            throw new Error(data.error || 'Не удалось добавить системный промпт');
+        }
+        addSystemPromptTurn(data.content);
+    } catch (err) {
+        console.error('Ошибка отправки системного промпта:', err);
+    } finally {
+        btnSendPrompt.style.opacity = '0.5';
+        setTimeout(() => { btnSendPrompt.style.opacity = ''; btnSendPrompt.disabled = false; }, 1500);
+    }
 });
 
 // ===== Рендер строки диалога =====
@@ -269,11 +276,10 @@ async function sendMessage() {
         const resp = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: text,
-                conversation_history: conversationHistory,
-                constraints: collectConstraints(),
-            }),
+             body: JSON.stringify({
+                 message: text,
+                 constraints: collectConstraints(),
+             }),
         });
 
         const data = await resp.json();
@@ -283,9 +289,6 @@ async function sendMessage() {
             addTurn(text, errMsg, null, null, null, null, null);
             return;
         }
-
-        conversationHistory.push({ role: 'user', content: text });
-        conversationHistory.push({ role: 'assistant', content: data.content });
 
         addTurn(
             text,
