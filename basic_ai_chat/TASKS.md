@@ -8,6 +8,14 @@
 - None.
 
 ## Completed
+- [x] #029 Показывать размышление модели и стартовать поток сразу
+  - [x] `llm.py`: кадры `start` и `reasoning`, ключ `reasoning` в `done`
+  - [x] `routers/chat.py`: пробросить `reasoning` в финальный кадр
+  - [x] `app.js`: индикатор «Размышление…», накопитель, сворачивание блока
+  - [x] `templates/style.css`: стили `.thinking` и `.reasoning`
+  - [x] Тесты (13) + `ruff check .` + проверка в браузере
+  - [x] Обновить Request Flow в `docs/ARCHITECTURE.md`
+
 - [x] #028 Форматирование ответа в реальном времени
   - [x] `templates/marked.min.js` + подключение в `index.html`
   - [x] `app.js`: `handle.raw`, троттлинг рендера, незакрытый ```, экранирование

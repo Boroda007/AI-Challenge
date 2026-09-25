@@ -133,6 +133,9 @@ def call_controlled(
         "raw": response.model_dump(),
         "request_payload": api_params,
         "content": choice.message.content or "",
+        "reasoning": getattr(choice.message, "reasoning", None)
+        or getattr(choice.message, "reasoning_content", None)
+        or "",
         "finish_reason": choice.finish_reason,
         "applied_params": _applied_params(constraints, dropped_params),
         "usage": _usage_dict(response),
@@ -169,8 +172,10 @@ def stream_controlled(
 ) -> Iterator[dict[str, Any]]:
     """Потоковая версия call_controlled: отдаёт чанки по мере поступления.
 
-    Сначала серия кадров {"type": "delta", ...}, затем один кадр
-    {"type": "done", ...} со всеми метаданными ответа.
+    Первым отдаётся кадр {"type": "start"} — чтобы отклик начинался сразу,
+    затем кадры {"type": "reasoning", ...} (размышление модели) и
+    {"type": "delta", ...}, затем один кадр {"type": "done", ...} со всеми
+    метаданными ответа.
     """
     client = state.get_client()
     api_params = _build_api_params(history, message, constraints)
@@ -178,9 +183,12 @@ def stream_controlled(
     dropped_params: list[str] = []
 
     parts: list[str] = []
+    reasoning_parts: list[str] = []
     raw_chunks: list[dict[str, Any]] = []
     finish_reason: Any = None
     usage: dict[str, int] | None = None
+
+    yield {"type": "start"}
 
     try:
         for chunk in stream:
@@ -192,6 +200,14 @@ def stream_controlled(
             if choice.finish_reason:
                 finish_reason = choice.finish_reason
             content = getattr(choice.delta, "content", None)
+            reasoning = getattr(choice.delta, "reasoning", None) or getattr(
+                choice.delta, "reasoning_content", None
+            )
+            if not content and reasoning:
+                reasoning_parts.append(reasoning)
+                raw_chunks.append(_chunk_raw(chunk, reasoning, choice.finish_reason))
+                yield {"type": "reasoning", "content": reasoning}
+                continue
             if not content:
                 continue
             parts.append(content)
@@ -209,6 +225,7 @@ def stream_controlled(
     yield {
         "type": "done",
         "content": "".join(parts),
+        "reasoning": "".join(reasoning_parts),
         "raw": raw_chunks,
         "request_payload": {**api_params, **stream_params},
         "finish_reason": finish_reason,

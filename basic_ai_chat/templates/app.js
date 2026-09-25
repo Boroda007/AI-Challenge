@@ -184,7 +184,72 @@ function createTurn(userText, rawRequest) {
     aiRow.appendChild(aiResponses);
     container.appendChild(aiRow);
 
-    return { aiCol, aiBubble, paramsRow, raw: '', renderTimer: null };
+    return {
+        aiCol,
+        aiBubble,
+        paramsRow,
+        raw: '',
+        renderTimer: null,
+        reasoning: '',
+        reasoningTimer: null,
+        thinkingEl: null,
+        reasoningBox: null,
+    };
+}
+
+// Показывает индикатор размышления модели.
+function showThinking(handle) {
+    if (handle.thinkingEl) return;
+    const el = document.createElement('div');
+    el.className = 'thinking';
+    el.textContent = 'Размышление…';
+    handle.paramsRow.before(el);
+    handle.thinkingEl = el;
+}
+
+// Дописывает очередной кусок размышления (текстом, троттлинг 60 мс).
+function appendReasoning(handle, text) {
+    if (!text) return;
+    handle.reasoning += text;
+
+    if (!handle.reasoningBox) {
+        const details = document.createElement('details');
+        details.className = 'reasoning';
+        details.open = true;
+        const summary = document.createElement('summary');
+        summary.textContent = 'Размышление модели';
+        const pre = document.createElement('pre');
+        details.appendChild(summary);
+        details.appendChild(pre);
+        handle.paramsRow.before(details);
+        handle.reasoningBox = { details, pre };
+    }
+
+    const { pre } = handle.reasoningBox;
+    const paint = () => {
+        handle.reasoningTimer = null;
+        pre.textContent = handle.reasoning;
+        scrollToBottom();
+    };
+    if (!handle.reasoningTimer) {
+        handle.reasoningTimer = setTimeout(paint, MD_RENDER_INTERVAL_MS);
+    }
+}
+
+// Сворачивает блок размышления и убирает индикатор.
+function collapseReasoning(handle) {
+    if (handle.reasoningTimer) {
+        clearTimeout(handle.reasoningTimer);
+        handle.reasoningTimer = null;
+    }
+    if (handle.reasoningBox) {
+        handle.reasoningBox.pre.textContent = handle.reasoning;
+        handle.reasoningBox.details.open = false;
+    }
+    if (handle.thinkingEl) {
+        handle.thinkingEl.remove();
+        handle.thinkingEl = null;
+    }
 }
 
 // Дописывает в созданную строку текст ответа, бейджи и сырой JSON.
@@ -382,13 +447,20 @@ async function sendMessage() {
                 if (!frame.startsWith('data: ')) continue;
                 const payload = JSON.parse(frame.slice(6));
 
-                if (payload.type === 'delta') {
+                if (payload.type === 'start') {
+                    showThinking(handle);
+                } else if (payload.type === 'reasoning') {
+                    appendReasoning(handle, payload.content);
+                } else if (payload.type === 'delta') {
+                    collapseReasoning(handle);
                     appendDelta(handle, payload.content);
                 } else if (payload.type === 'done') {
+                    collapseReasoning(handle);
                     done = true;
                     finalizeTurn(handle, payload.content, payload.finish_reason, payload.applied_params, payload.usage, payload.raw, payload.raw_request);
                 } else if (payload.type === 'error') {
                     done = true;
+                    collapseReasoning(handle);
                     appendDelta(handle, `\n\nОшибка: ${payload.message}`);
                 }
             }

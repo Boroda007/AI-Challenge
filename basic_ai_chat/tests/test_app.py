@@ -98,6 +98,7 @@ class ApiTests(unittest.TestCase):
 
     def test_chat_streams_deltas_and_done(self):
         def fake_stream(history, message, constraints):
+            yield {"type": "start"}
             yield {"type": "delta", "content": "cont"}
             yield {"type": "delta", "content": "rolled"}
             yield {
@@ -129,14 +130,14 @@ class ApiTests(unittest.TestCase):
             for chunk in response.text.split("\n\n")
             if chunk.startswith("data: ")
         ]
-        self.assertEqual([f["type"] for f in frames], ["delta", "delta", "done"])
-        self.assertEqual(frames[0]["content"], "cont")
-        self.assertEqual(frames[1]["content"], "rolled")
-        self.assertEqual(frames[2]["content"], "controlled")
-        self.assertEqual(frames[2]["raw_request"], {"model": "test-model", "messages": []})
-        self.assertIsNone(frames[2]["finish_reason"])
-        self.assertEqual(frames[2]["applied_params"], {"Длина": 20})
-        self.assertEqual(frames[2]["usage"], {"total": 3})
+        self.assertEqual([f["type"] for f in frames], ["start", "delta", "delta", "done"])
+        self.assertEqual(frames[1]["content"], "cont")
+        self.assertEqual(frames[2]["content"], "rolled")
+        self.assertEqual(frames[3]["content"], "controlled")
+        self.assertEqual(frames[3]["raw_request"], {"model": "test-model", "messages": []})
+        self.assertIsNone(frames[3]["finish_reason"])
+        self.assertEqual(frames[3]["applied_params"], {"Длина": 20})
+        self.assertEqual(frames[3]["usage"], {"total": 3})
         stream_call.assert_called_once_with([], "hello", constraints)
         self.assertEqual(
             history.get_history(),
@@ -210,6 +211,40 @@ class LlmServiceTests(unittest.TestCase):
         self.assertEqual(done["finish_reason"], "stop")
         self.assertEqual(done["usage"], {"prompt": 1, "completion": 2, "total": 3})
         self.assertEqual(len(done["raw"]), 2)
+
+    def test_stream_controlled_reports_reasoning(self):
+        def make_chunk(content=None, reasoning=None, finish_reason=None):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        delta=SimpleNamespace(content=content, reasoning=reasoning),
+                        finish_reason=finish_reason,
+                    )
+                ]
+            )
+
+        chunks = [
+            make_chunk(content="", reasoning="Размышляю"),
+            make_chunk(content="", reasoning=" о модели"),
+            make_chunk(content="Ответ", finish_reason="stop"),
+        ]
+        client = MagicMock()
+        client.chat.completions.create.return_value = iter(chunks)
+        with patch.object(state, "get_client", return_value=client), patch.object(
+            state, "get_active_model", return_value="test-model"
+        ):
+            frames = list(llm.stream_controlled([], "new", {}))
+
+        self.assertEqual(frames[0], {"type": "start"})
+        reasoning = [f["content"] for f in frames if f["type"] == "reasoning"]
+        self.assertEqual(reasoning, ["Размышляю", " о модели"])
+        deltas = [f["content"] for f in frames if f["type"] == "delta"]
+        self.assertEqual(deltas, ["Ответ"])
+        done = frames[-1]
+        self.assertEqual(done["type"], "done")
+        self.assertEqual(done["reasoning"], "Размышляю о модели")
+        self.assertEqual(done["content"], "Ответ")
+        self.assertEqual(len(done["raw"]), 3)
 
     def test_render_markdown(self):
         self.assertEqual(llm.render_markdown("# title"), "<h1>title</h1>")
