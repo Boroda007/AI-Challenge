@@ -149,7 +149,9 @@ function buildRawJson(rawApiResponse) {
     return JSON.stringify(rawApiResponse, null, 2);
 }
 
-function addTurn(userText, answerHtml, finishReason, appliedParams, usage, rawResponse, rawRequest) {
+// Создаёт пустую строку диалога (пользователь + заготовка ответа ИИ).
+// Возвращает хендл, в который потом дописывается ответ.
+function createTurn(userText, rawRequest) {
     const userRow = document.createElement('div');
     userRow.className = 'chat-row row-user';
     let userContent = `
@@ -166,13 +168,32 @@ function addTurn(userText, answerHtml, finishReason, appliedParams, usage, rawRe
     const aiRow = document.createElement('div');
     aiRow.className = 'chat-row row-ai';
 
-    let aiContent = `
-        <div class="ai-responses ai-responses--single">
-            <div class="ai-response-col">
-                <div class="msg-label">ИИ</div>
-                <div class="message ai"><div class="bubble">${answerHtml}</div></div>
-                <div class="params-row">
-    `;
+    const aiResponses = document.createElement('div');
+    aiResponses.className = 'ai-responses ai-responses--single';
+
+    const aiCol = document.createElement('div');
+    aiCol.className = 'ai-response-col';
+    aiCol.innerHTML = `
+        <div class="msg-label">ИИ</div>
+        <div class="message ai"><div class="bubble"></div></div>
+        <div class="params-row"></div>`;
+
+    const paramsRow = aiCol.querySelector('.params-row');
+    const aiBubble = aiCol.querySelector('.bubble');
+    aiResponses.appendChild(aiCol);
+    aiRow.appendChild(aiResponses);
+    container.appendChild(aiRow);
+
+    return { aiCol, aiBubble, paramsRow };
+}
+
+// Дописывает в созданную строку текст ответа, бейджи и сырой JSON.
+function finalizeTurn(handle, answerHtml, finishReason, appliedParams, usage, rawResponse) {
+    const { aiCol, aiBubble, paramsRow } = handle;
+
+    if (answerHtml !== null && answerHtml !== undefined) {
+        aiBubble.innerHTML = answerHtml;
+    }
 
     let badges = '';
     if (finishReason) {
@@ -187,19 +208,20 @@ function addTurn(userText, answerHtml, finishReason, appliedParams, usage, rawRe
             }
         }
     }
-    if (badges) aiContent += `<div class="params-block">${badges}</div>`;
-    if (usage) aiContent += `<div class="token-count">${usage.completion} токенов</div>`;
-    aiContent += `</div>`;
+    if (badges) paramsRow.insertAdjacentHTML('beforeend', `<div class="params-block">${badges}</div>`);
+    if (usage) paramsRow.insertAdjacentHTML('beforeend', `<div class="token-count">${usage.completion} токенов</div>`);
 
     if (rawResponse !== null && rawResponse !== undefined) {
         const rawJson = buildRawJson(rawResponse);
-        aiContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
+        aiCol.insertAdjacentHTML('beforeend', `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`);
     }
-    aiContent += `</div></div>`;
 
-    aiRow.innerHTML = aiContent;
-    container.appendChild(aiRow);
     scrollToBottom();
+}
+
+function addTurn(userText, answerHtml, finishReason, appliedParams, usage, rawResponse, rawRequest) {
+    const handle = createTurn(userText, rawRequest);
+    finalizeTurn(handle, answerHtml, finishReason, appliedParams, usage, rawResponse);
 }
 
 // ===== Рендер системного промпта в чате =====
