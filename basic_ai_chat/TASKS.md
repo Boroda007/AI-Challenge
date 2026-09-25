@@ -7,15 +7,12 @@
   - Connect history loading and synchronization to the UI.
   - Add tests for saving, loading, and error handling.
 
-## In Progress
-- [ ] #015 Remove parallel free/controlled chat flows
-  - Keep a single `call_controlled()` invocation and one API response.
-  - Remove `include_free`, free history, the free response, and `call_free()`.
-  - Unify frontend history and update the UI to display one response.
+## Completed
+- [x] #015 Remove parallel free/controlled chat flows
+  - Use one controlled invocation, one API response, and one client history.
+  - Remove free-mode fields, response, service function, and UI toggle.
   - Preserve the separate system-prompt action.
   - Update tests and documentation for the new contract.
-
-## Completed
 - [x] #026 Remove emojis from TASKS.md
 - [x] #025 Translate TASKS.md to English
 - [x] #024 Update and clean up the task list

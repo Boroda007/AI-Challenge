@@ -57,53 +57,45 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
-    def test_chat_uses_both_services(self):
-        free_result = {
-            "raw": {},
-            "request_payload": {"model": "test-model", "messages": []},
-            "content": "free",
-            "finish_reason": "stop",
-            "usage": None,
-        }
+    def test_chat_uses_single_controlled_service(self):
         controlled_result = {
-            "raw": {},
+            "raw": {"id": "response-id"},
             "request_payload": {"model": "test-model", "messages": []},
             "content": "controlled",
             "finish_reason": "stop",
-            "applied_params": {},
-            "usage": None,
+            "applied_params": {"Длина": 20},
+            "usage": {"total": 3},
         }
-        with patch.object(chat, "call_free", return_value=free_result) as free_call, patch.object(
-            chat, "call_controlled", return_value=controlled_result
-        ) as controlled_call, patch.object(chat, "render_markdown", side_effect=lambda text: text):
-            response = self.client.post("/api/chat", json={"message": "hello"})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["free_response"]["raw_content"], "free")
-        self.assertEqual(response.json()["controlled_response"]["raw_content"], "controlled")
-        free_call.assert_called_once()
-        controlled_call.assert_called_once()
-
-    def test_chat_skips_free_call_when_disabled(self):
-        controlled_result = {
-            "raw": {},
-            "request_payload": {},
-            "content": "controlled",
-            "finish_reason": "stop",
-            "applied_params": {},
-            "usage": None,
-        }
-        with patch.object(chat, "call_free") as free_call, patch.object(
+        history = [{"role": "user", "content": "old"}]
+        constraints = {"max_tokens": 20}
+        with patch.object(
             chat, "call_controlled", return_value=controlled_result
         ) as controlled_call, patch.object(chat, "render_markdown", side_effect=lambda text: text):
             response = self.client.post(
-                "/api/chat", json={"message": "hello", "include_free": False}
+                "/api/chat",
+                json={
+                    "message": "hello",
+                    "conversation_history": history,
+                    "constraints": constraints,
+                },
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.json()["free_response"])
-        free_call.assert_not_called()
-        controlled_call.assert_called_once()
+        self.assertEqual(
+            response.json(),
+            {
+                "raw": {"id": "response-id"},
+                "raw_request": {"model": "test-model", "messages": []},
+                "content": "controlled",
+                "raw_content": "controlled",
+                "finish_reason": None,
+                "applied_params": {"Длина": 20},
+                "usage": {"total": 3},
+            },
+        )
+        self.assertNotIn("free_response", response.json())
+        self.assertNotIn("controlled_response", response.json())
+        controlled_call.assert_called_once_with(history, "hello", constraints)
 
 
 class LlmServiceTests(unittest.TestCase):
@@ -113,24 +105,6 @@ class LlmServiceTests(unittest.TestCase):
             usage=SimpleNamespace(prompt_tokens=1, completion_tokens=2, total_tokens=3),
             model_dump=lambda: {"content": content},
         )
-
-    def test_call_free_builds_messages_and_returns_usage(self):
-        client = MagicMock()
-        client.chat.completions.create.return_value = self.make_response()
-        with patch.object(state, "_get_client", return_value=client), patch.object(
-            state, "_get_model_name", return_value="test-model"
-        ):
-            result = llm.call_free([{"role": "user", "content": "old"}], "new")
-
-        client.chat.completions.create.assert_called_once_with(
-            model="test-model",
-            messages=[
-                {"role": "user", "content": "old"},
-                {"role": "user", "content": "new"},
-            ],
-        )
-        self.assertEqual(result["content"], "answer")
-        self.assertEqual(result["usage"]["total"], 3)
 
     def test_call_controlled_passes_constraints(self):
         client = MagicMock()

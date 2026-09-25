@@ -1,7 +1,6 @@
 // ===== DOM =====
 const input = document.getElementById('userInput');
 const container = document.getElementById('chats-container');
-const cbFreeChat = document.getElementById('cb-free-chat');
 const btnSendChat = document.getElementById('btn-send-chat');
 const txtSysprompt = document.getElementById('txt-sysprompt');
 const btnSendPrompt = document.getElementById('btn-send-prompt');
@@ -17,11 +16,7 @@ function updateLayoutVars() {
 }
 
 // ===== История =====
-const freeChatHistory = [];
-const controlledChatHistory = [];
-
-// ===== Состояние =====
-let freeChatEnabled = false;
+const conversationHistory = [];
 
 // ===== Утилиты =====
 function escapeHtml(s) {
@@ -91,15 +86,12 @@ function updateSlider(sliderId, displayId, config) {
 }
 
 // ===== Panel tabs =====
-const freeChatToggle = document.querySelector('.free-chat-toggle');
-
 document.querySelectorAll('.panel-tab').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.panel-tab').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.panel-view').forEach(v => v.classList.remove('active'));
         btn.classList.add('active');
         document.querySelector(`[data-view="${btn.dataset.panel}"]`).classList.add('active');
-        freeChatToggle.style.display = btn.dataset.panel === 'chat' ? '' : 'none';
         updateLayoutVars();
     });
 });
@@ -135,7 +127,7 @@ btnSendPrompt.addEventListener('click', () => {
     if (!prompt) return;
 
     // Добавляем промпт как обычное сообщение в конец истории
-    controlledChatHistory.push({ role: 'system', content: prompt });
+    conversationHistory.push({ role: 'system', content: prompt });
 
     addSystemPromptTurn(prompt);
 
@@ -150,8 +142,7 @@ function buildRawJson(rawApiResponse) {
     return JSON.stringify(rawApiResponse, null, 2);
 }
 
-function addTurn(userText, freeHtml, controlledHtml, finishReason, appliedParams, freeUsage, controlledUsage, showFree, rawFree, rawControlled, rawRequest) {
-    // Сообщение пользователя (справа)
+function addTurn(userText, answerHtml, finishReason, appliedParams, usage, rawResponse, rawRequest) {
     const userRow = document.createElement('div');
     userRow.className = 'chat-row row-user';
     let userContent = `
@@ -165,112 +156,42 @@ function addTurn(userText, freeHtml, controlledHtml, finishReason, appliedParams
     userRow.innerHTML = userContent;
     container.appendChild(userRow);
 
-    // Ответ ИИ (слева)
     const aiRow = document.createElement('div');
     aiRow.className = 'chat-row row-ai';
 
-    let aiContent = ``;
+    let aiContent = `
+        <div class="ai-responses ai-responses--single">
+            <div class="ai-response-col">
+                <div class="msg-label">ИИ</div>
+                <div class="message ai"><div class="bubble">${answerHtml}</div></div>
+                <div class="params-row">
+    `;
 
-    if (showFree && freeHtml) {
-        // Два ответа рядом
-        aiContent += `<div class="ai-responses">`;
-
-        // Левая колонка: свободный ответ
-        aiContent += `<div class="ai-response-col">`;
-        aiContent += `<div class="msg-label">ИИ (без ограничений)</div>`;
-        aiContent += `<div class="message ai"><div class="bubble">${freeHtml}</div></div>`;
-        if (freeUsage) {
-            aiContent += `<div class="params-row"><div class="token-count">${freeUsage.completion} токенов</div></div>`;
-        }
-        if (rawFree !== null && rawFree !== undefined) {
-            const rawJson = buildRawJson(rawFree);
-            aiContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
-        }
-        aiContent += `</div>`;
-
-        // Правая колонка: контролируемый ответ
-        aiContent += `<div class="ai-response-col">`;
-        aiContent += `<div class="msg-label">ИИ</div>`;
-        aiContent += `<div class="message ai"><div class="bubble">${controlledHtml}</div></div>`;
-
-        // Бейджи + токены в одну строку
-        aiContent += `<div class="params-row">`;
-
-        let badges = '';
-        if (finishReason) {
-            const reasonMap = { stop: 'Стоп-символ', length: 'Длина', content_filter: 'Фильтр' };
-            const reasonLabel = reasonMap[finishReason] || finishReason;
-            badges += `<span class="param-badge param-badge--reason">Причина остановки: ${escapeHtml(reasonLabel)}</span>`;
-        }
-        if (appliedParams && typeof appliedParams === 'object') {
-            for (const [name, value] of Object.entries(appliedParams)) {
-                if (value !== null && value !== undefined) {
-                    badges += `<span class="param-badge">${escapeHtml(name)}: ${escapeHtml(String(value))}</span>`;
-                }
-            }
-        }
-        if (badges) {
-            aiContent += `<div class="params-block">${badges}</div>`;
-        }
-
-        if (controlledUsage) {
-            aiContent += `<div class="token-count">${controlledUsage.completion} токенов</div>`;
-        }
-
-        aiContent += `</div>`; // params-row
-
-        if (rawControlled !== null && rawControlled !== undefined) {
-            const rawJson = buildRawJson(rawControlled);
-            aiContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
-        }
-
-        aiContent += `</div>`; // ai-response-col
-        aiContent += `</div>`; // ai-responses
-    } else {
-        // Один ответ на всю ширину
-        aiContent += `<div class="ai-responses ai-responses--single">`;
-        aiContent += `<div class="ai-response-col">`;
-        aiContent += `<div class="msg-label">ИИ</div>`;
-        aiContent += `<div class="message ai"><div class="bubble">${controlledHtml}</div></div>`;
-
-        // Бейджи + токены в одну строку
-        aiContent += `<div class="params-row">`;
-
-        let badges = '';
-        if (finishReason) {
-            const reasonMap = { stop: 'Стоп-символ', length: 'Длина', content_filter: 'Фильтр' };
-            const reasonLabel = reasonMap[finishReason] || finishReason;
-            badges += `<span class="param-badge param-badge--reason">Причина остановки: ${escapeHtml(reasonLabel)}</span>`;
-        }
-        if (appliedParams && typeof appliedParams === 'object') {
-            for (const [name, value] of Object.entries(appliedParams)) {
-                if (value !== null && value !== undefined) {
-                    badges += `<span class="param-badge">${escapeHtml(name)}: ${escapeHtml(String(value))}</span>`;
-                }
-            }
-        }
-        if (badges) {
-            aiContent += `<div class="params-block">${badges}</div>`;
-        }
-
-        if (controlledUsage) {
-            aiContent += `<div class="token-count">${controlledUsage.completion} токенов</div>`;
-        }
-
-        aiContent += `</div>`; // params-row
-
-        if (rawControlled !== null && rawControlled !== undefined) {
-            const rawJson = buildRawJson(rawControlled);
-            aiContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
-        }
-
-        aiContent += `</div>`; // ai-response-col
-        aiContent += `</div>`; // ai-responses
+    let badges = '';
+    if (finishReason) {
+        const reasonMap = { stop: 'Стоп-символ', length: 'Длина', content_filter: 'Фильтр' };
+        const reasonLabel = reasonMap[finishReason] || finishReason;
+        badges += `<span class="param-badge param-badge--reason">Причина остановки: ${escapeHtml(reasonLabel)}</span>`;
     }
+    if (appliedParams && typeof appliedParams === 'object') {
+        for (const [name, value] of Object.entries(appliedParams)) {
+            if (value !== null && value !== undefined) {
+                badges += `<span class="param-badge">${escapeHtml(name)}: ${escapeHtml(String(value))}</span>`;
+            }
+        }
+    }
+    if (badges) aiContent += `<div class="params-block">${badges}</div>`;
+    if (usage) aiContent += `<div class="token-count">${usage.completion} токенов</div>`;
+    aiContent += `</div>`;
+
+    if (rawResponse !== null && rawResponse !== undefined) {
+        const rawJson = buildRawJson(rawResponse);
+        aiContent += `<details class="raw-json-toggle"><summary role="button" class="outline secondary">JSON-ответ</summary><pre><code>${escapeHtml(rawJson)}</code></pre></details>`;
+    }
+    aiContent += `</div></div>`;
 
     aiRow.innerHTML = aiContent;
     container.appendChild(aiRow);
-
     scrollToBottom();
 }
 
@@ -300,11 +221,6 @@ document.querySelectorAll('.setting-row[data-param]').forEach(row => {
             el.disabled = !cb.checked;
         });
     });
-});
-
-// ===== Переключатель свободного чата =====
-cbFreeChat.addEventListener('change', () => {
-    freeChatEnabled = cbFreeChat.checked;
 });
 
 // ===== Слайдеры: обновление числового индикатора =====
@@ -355,10 +271,8 @@ async function sendMessage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message: text,
-                free_history: freeChatEnabled ? freeChatHistory : [],
-                controlled_history: controlledChatHistory,
+                conversation_history: conversationHistory,
                 constraints: collectConstraints(),
-                include_free: freeChatEnabled,
             }),
         });
 
@@ -366,36 +280,26 @@ async function sendMessage() {
 
         if (data.error) {
             const errMsg = `Ошибка: ${escapeHtml(data.error)}`;
-            addTurn(text, errMsg, errMsg, null, null, null, null, false);
+            addTurn(text, errMsg, null, null, null, null, null);
             return;
         }
 
-        // Сохраняем ответы в историю
-        if (freeChatEnabled) {
-            freeChatHistory.push({ role: 'user', content: text });
-            freeChatHistory.push({ role: 'assistant', content: data.free_response.content });
-        }
-        controlledChatHistory.push({ role: 'user', content: text });
-        controlledChatHistory.push({ role: 'assistant', content: data.controlled_response.content });
+        conversationHistory.push({ role: 'user', content: text });
+        conversationHistory.push({ role: 'assistant', content: data.content });
 
-        // Рендерим строку
         addTurn(
             text,
-            freeChatEnabled ? data.free_response.content : null,
-            data.controlled_response.content,
-            data.controlled_response.finish_reason,
-            data.controlled_response.applied_params,
-            freeChatEnabled ? data.free_response.usage : null,
-            data.controlled_response.usage,
-            freeChatEnabled,
-            freeChatEnabled ? data.free_response.raw : null,
-            data.controlled_response.raw,
-            data.controlled_response.raw_request,
+            data.content,
+            data.finish_reason,
+            data.applied_params,
+            data.usage,
+            data.raw,
+            data.raw_request,
         );
 
     } catch (err) {
         const errMsg = `Ошибка сети: ${escapeHtml(err.message)}`;
-        addTurn(text, errMsg, errMsg, null, null, null, null, false);
+        addTurn(text, errMsg, null, null, null, null, null);
     } finally {
         input.disabled = false;
         btnSendChat.disabled = !input.value.trim();
@@ -407,7 +311,6 @@ async function sendMessage() {
 window.addEventListener('load', () => {
     updateLayoutVars();
     initButtonVisibility();
-    freeChatToggle.style.display = 'none';
     txtSysprompt.style.height = 'auto';
     txtSysprompt.style.height = txtSysprompt.scrollHeight + 'px';
 

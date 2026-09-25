@@ -1,9 +1,9 @@
 import logging
 from typing import Any
 
-from openai import BadRequestError, OpenAI
+from openai import BadRequestError
 from openai.types.chat import ChatCompletionMessageParam
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import state
 
@@ -12,42 +12,8 @@ logger = logging.getLogger(__name__)
 
 class ChatRequest(BaseModel):
     message: str
-    free_history: list[ChatCompletionMessageParam] = []
-    controlled_history: list[ChatCompletionMessageParam] = []
-    constraints: dict[str, Any] = {}
-    include_free: bool = True
-
-
-def call_free(
-    history: list[ChatCompletionMessageParam], message: str
-) -> dict[str, Any]:
-    """Свободный вызов — стандартные параметры, без системного промпта."""
-    client: OpenAI = state._get_client()
-    model: str = state._get_model_name()
-
-    messages: list[ChatCompletionMessageParam] = history + [
-        {"role": "user", "content": message}
-    ]
-
-    response = client.chat.completions.create(model=model, messages=messages)
-
-    choice = response.choices[0]
-
-    usage_data = None
-    if response.usage:
-        usage_data = {
-            "prompt": response.usage.prompt_tokens,
-            "completion": response.usage.completion_tokens,
-            "total": response.usage.total_tokens,
-        }
-
-    return {
-        "raw": response.model_dump(),
-        "request_payload": {"model": model, "messages": messages},
-        "content": choice.message.content or "",
-        "finish_reason": choice.finish_reason,
-        "usage": usage_data,
-    }
+    conversation_history: list[ChatCompletionMessageParam] = Field(default_factory=list)
+    constraints: dict[str, Any] = Field(default_factory=dict)
 
 
 def call_controlled(

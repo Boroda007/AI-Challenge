@@ -353,15 +353,6 @@ body {
     cursor: not-allowed;
 }
 
-/* ===== Free chat toggle ===== */
-.free-chat-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #333;
-}
-
 /* ===== Raw JSON accordion ===== */
 .raw-json-toggle {
     margin-top: 8px;
