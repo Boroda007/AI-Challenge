@@ -8,6 +8,11 @@
 - None.
 
 ## Completed
+- [x] #028 Форматирование ответа в реальном времени
+  - [x] `templates/marked.min.js` + подключение в `index.html`
+  - [x] `app.js`: `handle.raw`, троттлинг рендера, незакрытый ```, экранирование
+  - [x] Тесты (12) + `ruff check .` + проверка в браузере
+
 - [x] #027 Стриминг ответов ИИ через SSE
   - [x] `llm.py`: `stream_controlled()` поверх хелперов из #026
   - [x] `routers/chat.py`: `/api/chat` → `StreamingResponse`, `append_turn` после потока

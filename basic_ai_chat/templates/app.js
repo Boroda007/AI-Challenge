@@ -184,12 +184,17 @@ function createTurn(userText, rawRequest) {
     aiRow.appendChild(aiResponses);
     container.appendChild(aiRow);
 
-    return { aiCol, aiBubble, paramsRow };
+    return { aiCol, aiBubble, paramsRow, raw: '', renderTimer: null };
 }
 
 // Дописывает в созданную строку текст ответа, бейджи и сырой JSON.
 function finalizeTurn(handle, answerHtml, finishReason, appliedParams, usage, rawResponse) {
     const { aiCol, aiBubble, paramsRow } = handle;
+
+    if (handle.renderTimer) {
+        clearTimeout(handle.renderTimer);
+        handle.renderTimer = null;
+    }
 
     if (answerHtml !== null && answerHtml !== undefined) {
         aiBubble.innerHTML = answerHtml;
@@ -219,11 +224,50 @@ function finalizeTurn(handle, answerHtml, finishReason, appliedParams, usage, ra
     scrollToBottom();
 }
 
-// Дописывает очередной кусок текста в пустой бабл ответа (textContent — безопасно).
+// Частота перерисовки markdown во время стриминга (мс).
+const MD_RENDER_INTERVAL_MS = 60;
+
+// Экранирует HTML в тексте модели: в live-рендер уходит только markdown.
+function escapeSourceHtml(text) {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Перерисовывает бабл ответа из накопленного текста.
+function renderLiveMarkdown(handle) {
+    const text = handle.raw;
+    if (!text) {
+        handle.aiBubble.textContent = '';
+        return;
+    }
+    // Незакрытый ``` — рендерить ухудшённо, как обычный текст в <pre>.
+    if ((text.split('```').length - 1) % 2 === 1) {
+        const pre = document.createElement('pre');
+        pre.textContent = text;
+        handle.aiBubble.innerHTML = '';
+        handle.aiBubble.appendChild(pre);
+        return;
+    }
+    handle.aiBubble.innerHTML = marked.parse(escapeSourceHtml(text), { gfm: true, breaks: true });
+}
+
+// Дописывает очередной кусок текста в пустой бабл ответа и перерисовывает markdown
+// не чаще, чем раз в MD_RENDER_INTERVAL_MS мс.
 function appendDelta(handle, text) {
     if (!text) return;
-    handle.aiBubble.textContent += text;
-    scrollToBottom();
+    const isFirst = !handle.raw;
+    handle.raw += text;
+
+    if (isFirst) {
+        renderLiveMarkdown(handle);
+        scrollToBottom();
+        return;
+    }
+    if (handle.renderTimer) return;
+    handle.renderTimer = setTimeout(() => {
+        handle.renderTimer = null;
+        renderLiveMarkdown(handle);
+        scrollToBottom();
+    }, MD_RENDER_INTERVAL_MS);
 }
 
 function addTurn(userText, answerHtml, finishReason, appliedParams, usage, rawResponse, rawRequest) {
