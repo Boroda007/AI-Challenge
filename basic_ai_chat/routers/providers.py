@@ -1,9 +1,8 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from openai import OpenAI
 
 import reasoning
-import state
+from state import state
 
 router = APIRouter()
 
@@ -11,44 +10,21 @@ router = APIRouter()
 @router.post("/api/switch-model")
 async def switch_model(provider: str, model: str):
     """Смена провайдера/модели без перезапуска сервера."""
-    provider_cfg = state._providers_config.get(provider) if provider else None
+    try:
+        state.switch_model(provider, model)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
 
-    if provider not in state._providers_config:
-        return JSONResponse(
-            {"error": f"Провайдер '{provider}' не найден"}, status_code=400
-        )
-
-    provider_cfg = state._providers_config[provider]
-    model_config = None
-    for m in provider_cfg.get("models", []):
-        if m["id"] == model:
-            model_config = m
-            break
-
-    if model_config is None:
-        return JSONResponse(
-            {"error": f"Модель '{model}' не найдена у провайдера '{provider}'"},
-            status_code=400,
-        )
-
-    state._active_provider = provider
-    state._active_model = model
-    state._active_model_config = model_config
-    state._client = OpenAI(
-        base_url=provider_cfg["base_url"],
-        api_key=provider_cfg.get("api_key", "") or "none",
-    )
-
-    state._save_providers_config()
+    model_config = state.get_active_model_config()
 
     return JSONResponse(
         {
-            "provider": state._active_provider,
-            "model": state._active_model,
+            "provider": state.get_active_provider(),
+            "model": state.get_active_model(),
             "supported_values": {
-                "reasoning_effort": reasoning.effort_levels(state._active_model),
-                "temperature": state._active_model_config.get("temperature", {}),
-                "max_tokens": state._active_model_config.get("max_tokens", {}),
+                "reasoning_effort": reasoning.effort_levels(state.get_active_model()),
+                "temperature": model_config.get("temperature", {}),
+                "max_tokens": model_config.get("max_tokens", {}),
             },
         }
     )
@@ -58,26 +34,22 @@ async def switch_model(provider: str, model: str):
 async def get_providers():
     """Список всех провайдеров и моделей из providers.json."""
     result = {}
-    for provider_name, provider in state._providers_config.items():
-        models_list = []
-        if "models" in provider and isinstance(provider["models"], list):
-            models_list = [
-                {"id": m["id"], "name": m.get("name", m["id"])}
-                for m in provider["models"]
-            ]
-        elif "models" in provider and isinstance(provider["models"], dict):
-            models_list = [{"id": k, "name": v} for k, v in provider["models"].items()]
+    for provider_name, provider in state.get_providers_config().items():
+        models_list = [
+            {"id": m["id"], "name": m["name"]}
+            for m in provider.get("models", [])
+        ]
 
         result[provider_name] = {
-            "name": provider.get("name", provider_name),
-            "base_url": provider.get("base_url", ""),
+            "name": provider["name"],
+            "base_url": provider["base_url"],
             "models": models_list,
         }
 
     return {
         "providers": result,
-        "active_provider": state._active_provider,
-        "active_model": state._active_model,
+        "active_provider": state.get_active_provider(),
+        "active_model": state.get_active_model(),
     }
 
 
@@ -87,8 +59,8 @@ async def get_supported_values():
     temperature/max_tokens из providers.json."""
     return JSONResponse(
         {
-            "reasoning_effort": reasoning.effort_levels(state._active_model),
-            "temperature": state._active_model_config.get("temperature", {}),
-            "max_tokens": state._active_model_config.get("max_tokens", {}),
+            "reasoning_effort": reasoning.effort_levels(state.get_active_model()),
+            "temperature": state.get_active_model_config().get("temperature", {}),
+            "max_tokens": state.get_active_model_config().get("max_tokens", {}),
         }
     )

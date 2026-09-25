@@ -1,37 +1,50 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-import state
 from app import app
 from routers import chat
 from services import history, llm
+from state import state
+
+TEST_CONFIG = {
+    "active_provider": "test",
+    "active_model": "test-model",
+    "providers": {
+        "test": {
+            "name": "Test provider",
+            "base_url": "http://test",
+            "models": [
+                {
+                    "id": "test-model",
+                    "name": "Test model",
+                    "temperature": {"min": 0, "max": 2, "default": 0.7},
+                    "max_tokens": {"min": 5, "max": 100, "default": 20},
+                }
+            ],
+        }
+    },
+}
 
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
         history.clear_history()
+        self.addCleanup(history.clear_history)
+
+        self._tmp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp_dir.cleanup)
+        tmp_path = Path(self._tmp_dir.name)
+        config_path = tmp_path / "providers.json"
+        config_path.write_text(json.dumps(TEST_CONFIG), encoding="utf-8")
+
+        state.init(config_path)
         self.client = TestClient(app)
-        state._providers_config = {
-            "test": {
-                "name": "Test provider",
-                "base_url": "http://test",
-                "models": [
-                    {
-                        "id": "test-model",
-                        "name": "Test model",
-                        "temperature": {"min": 0, "max": 2, "default": 0.7},
-                        "max_tokens": {"min": 5, "max": 100, "default": 20},
-                    }
-                ],
-            }
-        }
-        state._active_provider = "test"
-        state._active_model = "test-model"
-        state._active_model_config = state._providers_config["test"]["models"][0]
-        state._raw_config = {"active_provider": "test", "active_model": "test-model"}
 
     def test_routes_are_registered_once(self):
         paths = app.openapi()["paths"]
@@ -143,8 +156,8 @@ class LlmServiceTests(unittest.TestCase):
         client = MagicMock()
         client.chat.completions.create.return_value = self.make_response()
         constraints = {"max_tokens": 20, "temperature": 0.2}
-        with patch.object(state, "_get_client", return_value=client), patch.object(
-            state, "_get_model_name", return_value="test-model"
+        with patch.object(state, "get_client", return_value=client), patch.object(
+            state, "get_active_model", return_value="test-model"
         ):
             result = llm.call_controlled([], "new", constraints)
 

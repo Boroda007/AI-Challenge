@@ -5,7 +5,7 @@ from openai import BadRequestError
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel, Field
 
-import state
+from state import state
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ def call_controlled(
     history: list[ChatCompletionMessageParam], message: str, constraints: dict[str, Any]
 ) -> dict[str, Any]:
     """Контролируемый вызов — с системным промптом и параметрами из constraints."""
-    client = state._get_client()
-    model = state._get_model_name()
+    client = state.get_client()
+    model = state.get_active_model()
     messages: list[ChatCompletionMessageParam] = list(history) + [
         {"role": "user", "content": message}
     ]
