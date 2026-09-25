@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Iterator
 from typing import Any
 
-from openai import BadRequestError
+from openai import BadRequestError, OpenAIError
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel, Field
 
@@ -135,6 +136,84 @@ def call_controlled(
         "finish_reason": choice.finish_reason,
         "applied_params": _applied_params(constraints, dropped_params),
         "usage": _usage_dict(response),
+    }
+
+
+def _open_stream(client: Any, api_params: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    """Открывает поток с учётом usage; при отказе в stream_options повторяет без него.
+
+    Возвращает поток и фактически отправленные параметры потока.
+    """
+    extra: dict[str, Any] = {"stream": True, "stream_options": {"include_usage": True}}
+    while True:
+        try:
+            return client.chat.completions.create(**api_params, **extra), extra
+        except BadRequestError as e:
+            if "stream_options" not in extra or "stream_options" not in str(e).lower():
+                raise
+            del extra["stream_options"]  # провайдер не умеет отдавать usage в потоке
+
+
+def _chunk_raw(chunk: Any, content: str, finish_reason: Any) -> dict[str, Any]:
+    """Сырые данные чанка для блока «JSON-ответ»."""
+    model_dump = getattr(chunk, "model_dump", None)
+    if callable(model_dump):
+        raw: object = model_dump()
+        if isinstance(raw, dict):
+            return raw
+    return {"delta": {"content": content}, "finish_reason": finish_reason}
+
+
+def stream_controlled(
+    history: list[ChatCompletionMessageParam], message: str, constraints: dict[str, Any]
+) -> Iterator[dict[str, Any]]:
+    """Потоковая версия call_controlled: отдаёт чанки по мере поступления.
+
+    Сначала серия кадров {"type": "delta", ...}, затем один кадр
+    {"type": "done", ...} со всеми метаданными ответа.
+    """
+    client = state.get_client()
+    api_params = _build_api_params(history, message, constraints)
+    stream, stream_params = _open_stream(client, api_params)
+    dropped_params: list[str] = []
+
+    parts: list[str] = []
+    raw_chunks: list[dict[str, Any]] = []
+    finish_reason: Any = None
+    usage: dict[str, int] | None = None
+
+    try:
+        for chunk in stream:
+            if getattr(chunk, "usage", None):
+                usage = _usage_dict(chunk)
+            if not chunk.choices:
+                continue
+            choice = chunk.choices[0]
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+            content = getattr(choice.delta, "content", None)
+            if not content:
+                continue
+            parts.append(content)
+            raw_chunks.append(_chunk_raw(chunk, content, choice.finish_reason))
+            yield {"type": "delta", "content": content}
+    except OpenAIError as e:
+        logger.error("Ошибка во время стриминга: %s", e)
+        yield {"type": "error", "message": str(e)}
+        return
+
+    for param in RETRY_PARAMS:
+        if param not in api_params and constraints.get(param) is not None:
+            dropped_params.append(param)
+
+    yield {
+        "type": "done",
+        "content": "".join(parts),
+        "raw": raw_chunks,
+        "request_payload": {**api_params, **stream_params},
+        "finish_reason": finish_reason,
+        "applied_params": _applied_params(constraints, dropped_params),
+        "usage": usage,
     }
 
 

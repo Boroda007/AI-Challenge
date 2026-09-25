@@ -11,10 +11,12 @@ Web application for chatting with LLM via OpenAI-compatible API.
 - `state.py` owns the active client and selected model, reading and updating `providers.json`; `reasoning.py` loads model capabilities from `models.json`.
 
 ### Request Flow
-1. `templates/app.js` sends `POST /api/chat` with the current message and constraints.
-2. `routers/chat.py` reads the server-side history, appends the current user message for the LLM call, and delegates to `services/llm.py`.
-3. After a successful response, the router appends the user and raw assistant messages to `services/history.py`.
-4. `app.js` renders the response, usage, parameters, and raw data without maintaining a separate conversation history.
+1. `templates/app.js` sends `POST /api/chat` with the current message and constraints and reads the response as a stream (`getReader()` + `TextDecoder`).
+2. `routers/chat.py` takes the first frame from `services/llm.py` (errors before the stream start still return a regular JSON 500), then replies with `StreamingResponse` (`text/event-stream`).
+3. `stream_controlled()` sends `stream=True` (plus `stream_options={"include_usage": True}`) and yields SSE frames: `{"type": "delta", "content": …}` per chunk, then one `{"type": "done", …}` frame with the accumulated text, raw chunks, request payload, finish reason, applied parameters, and usage. Errors mid-stream arrive as `{"type": "error", "message": …}`.
+4. `app.js` appends every delta to the empty answer bubble as plain text, and on the `done` frame renders markdown once and adds the badges, token count, and raw JSON.
+5. Only after a successful `done` frame the router appends the user and assistant messages to `services/history.py`, so an interrupted stream never pollutes the history.
+6. `app.js` does not maintain a separate conversation history.
 
 ## Frontend
 - **Vanilla JavaScript** (`templates/app.js`) — unified client logic for the UI, parameters, API requests, system-prompt submission, and response rendering.

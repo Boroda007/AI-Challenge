@@ -96,45 +96,48 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(history.get_history(), [])
 
-    def test_chat_uses_single_controlled_service(self):
-        controlled_result = {
-            "raw": {"id": "response-id"},
-            "request_payload": {"model": "test-model", "messages": []},
-            "content": "controlled",
-            "finish_reason": "stop",
-            "applied_params": {"Длина": 20},
-            "usage": {"total": 3},
-        }
-        prior_history = [{"role": "user", "content": "old"}]
+    def test_chat_streams_deltas_and_done(self):
+        def fake_stream(history, message, constraints):
+            yield {"type": "delta", "content": "cont"}
+            yield {"type": "delta", "content": "rolled"}
+            yield {
+                "type": "done",
+                "content": "controlled",
+                "raw": {"id": "response-id"},
+                "request_payload": {"model": "test-model", "messages": []},
+                "finish_reason": "stop",
+                "applied_params": {"Длина": 20},
+                "usage": {"total": 3},
+            }
+
         constraints = {"max_tokens": 20}
-        with patch.object(
-            chat, "call_controlled", return_value=controlled_result
-        ) as controlled_call, patch.object(chat, "render_markdown", side_effect=lambda text: text):
+        with patch.object(chat, "stream_controlled", side_effect=fake_stream) as stream_call, patch.object(
+            chat, "render_markdown", side_effect=lambda text: text
+        ):
             response = self.client.post(
                 "/api/chat",
                 json={
                     "message": "hello",
-                    "conversation_history": prior_history,
                     "constraints": constraints,
                 },
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {
-                "raw": {"id": "response-id"},
-                "raw_request": {"model": "test-model", "messages": []},
-                "content": "controlled",
-                "raw_content": "controlled",
-                "finish_reason": None,
-                "applied_params": {"Длина": 20},
-                "usage": {"total": 3},
-            },
-        )
-        self.assertNotIn("free_response", response.json())
-        self.assertNotIn("controlled_response", response.json())
-        controlled_call.assert_called_once_with([], "hello", constraints)
+        self.assertTrue(response.headers["content-type"].startswith("text/event-stream"))
+        frames = [
+            json.loads(chunk[len("data: ") :])
+            for chunk in response.text.split("\n\n")
+            if chunk.startswith("data: ")
+        ]
+        self.assertEqual([f["type"] for f in frames], ["delta", "delta", "done"])
+        self.assertEqual(frames[0]["content"], "cont")
+        self.assertEqual(frames[1]["content"], "rolled")
+        self.assertEqual(frames[2]["content"], "controlled")
+        self.assertEqual(frames[2]["raw_request"], {"model": "test-model", "messages": []})
+        self.assertIsNone(frames[2]["finish_reason"])
+        self.assertEqual(frames[2]["applied_params"], {"Длина": 20})
+        self.assertEqual(frames[2]["usage"], {"total": 3})
+        stream_call.assert_called_once_with([], "hello", constraints)
         self.assertEqual(
             history.get_history(),
             [
@@ -165,6 +168,48 @@ class LlmServiceTests(unittest.TestCase):
         self.assertEqual(request["max_tokens"], 20)
         self.assertEqual(request["temperature"], 0.2)
         self.assertEqual(result["applied_params"], {"Длина": 20, "Температура": 0.2})
+
+    def test_stream_controlled_accumulates(self):
+        def make_chunk(content=None, finish_reason=None, usage=None):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(delta=SimpleNamespace(content=content), finish_reason=finish_reason)
+                ]
+                if content is not None or finish_reason is not None
+                else [],
+                usage=usage,
+            )
+
+        chunks = [
+            make_chunk("При"),
+            make_chunk("вет"),
+            make_chunk(
+                content="",
+                finish_reason="stop",
+            ),
+            make_chunk(
+                content=None,
+                usage=SimpleNamespace(prompt_tokens=1, completion_tokens=2, total_tokens=3),
+            ),
+        ]
+        client = MagicMock()
+        client.chat.completions.create.return_value = iter(chunks)
+        with patch.object(state, "get_client", return_value=client), patch.object(
+            state, "get_active_model", return_value="test-model"
+        ):
+            frames = list(llm.stream_controlled([], "new", {}))
+
+        request = client.chat.completions.create.call_args.kwargs
+        self.assertTrue(request["stream"])
+        self.assertEqual(request["stream_options"], {"include_usage": True})
+        deltas = [f["content"] for f in frames if f["type"] == "delta"]
+        self.assertEqual(deltas, ["При", "вет"])
+        done = frames[-1]
+        self.assertEqual(done["type"], "done")
+        self.assertEqual(done["content"], "Привет")
+        self.assertEqual(done["finish_reason"], "stop")
+        self.assertEqual(done["usage"], {"prompt": 1, "completion": 2, "total": 3})
+        self.assertEqual(len(done["raw"]), 2)
 
     def test_render_markdown(self):
         self.assertEqual(llm.render_markdown("# title"), "<h1>title</h1>")

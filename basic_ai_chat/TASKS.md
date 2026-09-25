@@ -2,17 +2,19 @@
 
 ## To Do
 
-- [ ] #027 Стриминг ответов ИИ через SSE
-  - [ ] `llm.py`: `stream_controlled()` поверх хелперов из #026
-  - [ ] `routers/chat.py`: `/api/chat` → `StreamingResponse`, `append_turn` после потока
-  - [ ] `app.js`: `getReader()`, `appendDelta()`, markdown в конце
-  - [ ] Тесты (13) + `ruff check .` + проверка в браузере
-  - [ ] Обновить Request Flow в `docs/ARCHITECTURE.md`
+- None.
 
 ## In Progress
 - None.
 
 ## Completed
+- [x] #027 Стриминг ответов ИИ через SSE
+  - [x] `llm.py`: `stream_controlled()` поверх хелперов из #026
+  - [x] `routers/chat.py`: `/api/chat` → `StreamingResponse`, `append_turn` после потока
+  - [x] `app.js`: `getReader()`, `appendDelta()`, markdown в конце
+  - [x] Тесты (12) + `ruff check .` + проверка в браузере
+  - [x] Обновить Request Flow в `docs/ARCHITECTURE.md`
+
 - [x] #026 Выделить переиспользуемые части в `llm.py` и разделить `addTurn` в `app.js`
   - [x] `llm.py`: вынесены `_build_api_params()`, `_create_with_retry()`, `_applied_params()`,
     `_usage_dict()`, константы `PARAM_MAPPING` / `RETRY_PARAMS`; `call_controlled` стал оркестратором.

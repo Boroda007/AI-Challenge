@@ -219,6 +219,13 @@ function finalizeTurn(handle, answerHtml, finishReason, appliedParams, usage, ra
     scrollToBottom();
 }
 
+// Дописывает очередной кусок текста в пустой бабл ответа (textContent — безопасно).
+function appendDelta(handle, text) {
+    if (!text) return;
+    handle.aiBubble.textContent += text;
+    scrollToBottom();
+}
+
 function addTurn(userText, answerHtml, finishReason, appliedParams, usage, rawResponse, rawRequest) {
     const handle = createTurn(userText, rawRequest);
     finalizeTurn(handle, answerHtml, finishReason, appliedParams, usage, rawResponse);
@@ -304,23 +311,44 @@ async function sendMessage() {
              }),
         });
 
-        const data = await resp.json();
-
-        if (data.error) {
-            const errMsg = `Ошибка: ${escapeHtml(data.error)}`;
-            addTurn(text, errMsg, null, null, null, null, null);
+        if (!resp.ok && !resp.headers.get('content-type', '').includes('text/event-stream')) {
+            // Ошибка до начала потока — обычный JSON-ответ.
+            const data = await resp.json();
+            addTurn(text, `Ошибка: ${escapeHtml(data.error || resp.statusText)}`, null, null, null, null, null);
             return;
         }
 
-        addTurn(
-            text,
-            data.content,
-            data.finish_reason,
-            data.applied_params,
-            data.usage,
-            data.raw,
-            data.raw_request,
-        );
+        const handle = createTurn(text, null);
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let done = false;
+
+        while (!done) {
+            const { value, done: streamDone } = await reader.read();
+            if (streamDone) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let sep = buffer.indexOf('\n\n');
+            while (sep !== -1) {
+                const frame = buffer.slice(0, sep);
+                buffer = buffer.slice(sep + 2);
+                sep = buffer.indexOf('\n\n');
+
+                if (!frame.startsWith('data: ')) continue;
+                const payload = JSON.parse(frame.slice(6));
+
+                if (payload.type === 'delta') {
+                    appendDelta(handle, payload.content);
+                } else if (payload.type === 'done') {
+                    done = true;
+                    finalizeTurn(handle, payload.content, payload.finish_reason, payload.applied_params, payload.usage, payload.raw, payload.raw_request);
+                } else if (payload.type === 'error') {
+                    done = true;
+                    appendDelta(handle, `\n\nОшибка: ${payload.message}`);
+                }
+            }
+        }
 
     } catch (err) {
         const errMsg = `Ошибка сети: ${escapeHtml(err.message)}`;
