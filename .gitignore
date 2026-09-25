@@ -1,6 +1,9 @@
 # локальные переменные
 .env
 providers.json
+opencode.json
+
+.opencode/
 
 # виртуальное окружение Python
 .venv/
