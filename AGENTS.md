@@ -2,7 +2,7 @@
 
 ## Environment
 Working dir: project root (where OpenCode runs).
-Activate venv: `source venv/bin/activate`
+Activate venv: `source .venv/bin/activate`
 
 ## Running
 `python app.py` → http://127.0.0.1:8000
@@ -21,7 +21,7 @@ Before coding or answering, follow these steps:
 1. Read `TASKS.md`.
 2. Pick the highest-priority task from `## To Do`. If none, agree on a new task with the user.
 3. Move it to `## In Progress`.
-4. Implement, run tests, fix errors. Stay within the current task.
+4. Complete the task — directly, or by dispatching agents if you coordinate. Stay within the current task.
 5. Move the task to `## Completed` once verified.
 6. Only then report completion to the user.
 

@@ -12,3 +12,4 @@ venv/
 # служебные файлы Python
 __pycache__/
 *.pyc
+.ruff_cache/
