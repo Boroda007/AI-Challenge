@@ -15,8 +15,9 @@ Web application for chatting with LLM via OpenAI-compatible API.
 2. `routers/chat.py` takes the first frame from `services/llm.py` (errors before the stream start still return a regular JSON 500), then replies with `StreamingResponse` (`text/event-stream`).
 3. `stream_controlled()` sends `stream=True` (plus `stream_options={"include_usage": True}`) and first yields `{"type": "start"}` so the response starts immediately, then `{"type": "reasoning", "content": …}` per thinking chunk (field `delta.reasoning` or `delta.reasoning_content`), then `{"type": "delta", "content": …}` per content chunk, and finally one `{"type": "done", …}` frame with the accumulated reasoning and text, raw chunks, request payload, finish reason, applied parameters, and usage. Errors mid-stream arrive as `{"type": "error", "message": …}`.
 4. `app.js` shows a "Размышление…" indicator on `start`, streams the thinking text into a collapsible block on `reasoning` (collapsing it when the answer begins), appends every delta to the answer bubble, and on the `done` frame renders markdown once and adds the badges, token count, and raw JSON.
-5. Only after a successful `done` frame the router appends the user and assistant messages to `services/history.py`, so an interrupted stream never pollutes the history.
-6. `app.js` does not maintain a separate conversation history.
+5. The stop button (`#btn-stop-generation`) aborts the in-flight stream via `AbortController` (`chatController` in `app.js`): the partial answer stays visible and is finalized with an «Остановлено» badge (`finalizePartial()`), while the send button is hidden during generation and restored afterwards.
+6. Only after a successful `done` frame the router appends the user and assistant messages to `services/history.py`, so an interrupted or stopped stream never pollutes the history.
+7. `app.js` does not maintain a separate conversation history.
 
 ## Frontend
 - **Vanilla JavaScript** (`templates/app.js`) — unified client logic for the UI, parameters, API requests, system-prompt submission, and response rendering.

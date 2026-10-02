@@ -6,6 +6,10 @@ const txtSysprompt = document.getElementById('txt-sysprompt');
 const btnSendPrompt = document.getElementById('btn-send-prompt');
 const selReasoning = document.getElementById('sel-reasoning');
 const cbReasoning = document.getElementById('cb-reasoning');
+const btnStop = document.getElementById('btn-stop-generation');
+
+// Контроллер текущего стриминга — для кнопки остановки генерации.
+let chatController = null;
 
 // ===== Раскладка =====
 function updateLayoutVars() {
@@ -398,8 +402,25 @@ function collectConstraints() {
     return c;
 }
 
+// Сбрасывает отложенный рендер и дописывает markdown в бабл.
+function flushLive(handle) {
+    if (handle.renderTimer) {
+        clearTimeout(handle.renderTimer);
+        handle.renderTimer = null;
+    }
+    renderLiveMarkdown(handle);
+}
+
+// Финализирует частичный ответ без кадра done (стоп, обрыв потока, сетевая ошибка).
+function finalizePartial(handle, badges) {
+    collapseReasoning(handle);
+    flushLive(handle);
+    finalizeTurn(handle, null, null, badges, null, null);
+}
+
 // ===== Отправка и обработка =====
 async function sendMessage() {
+    if (chatController) return;
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
@@ -410,6 +431,14 @@ async function sendMessage() {
     input.disabled = true;
     btnSendChat.disabled = true;
 
+    let handle = null;
+    let done = false;
+    const controller = new AbortController();
+    chatController = controller;
+    btnSendChat.hidden = true;
+    btnStop.disabled = false;
+    btnStop.hidden = false;
+
     try {
         const resp = await fetch('/api/chat', {
             method: 'POST',
@@ -418,6 +447,7 @@ async function sendMessage() {
                  message: text,
                  constraints: collectConstraints(),
              }),
+            signal: controller.signal,
         });
 
         if (!resp.ok && !resp.headers.get('content-type', '').includes('text/event-stream')) {
@@ -427,11 +457,10 @@ async function sendMessage() {
             return;
         }
 
-        const handle = createTurn(text, null);
+        handle = createTurn(text, null);
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
-        let done = false;
 
         while (!done) {
             const { value, done: streamDone } = await reader.read();
@@ -460,16 +489,33 @@ async function sendMessage() {
                     finalizeTurn(handle, payload.content, payload.finish_reason, payload.applied_params, payload.usage, payload.raw, payload.raw_request);
                 } else if (payload.type === 'error') {
                     done = true;
-                    collapseReasoning(handle);
                     appendDelta(handle, `\n\nОшибка: ${payload.message}`);
+                    finalizePartial(handle, null);
                 }
             }
         }
 
+        // Поток кончился без кадров done/error — финализируем частичный ответ.
+        if (handle && !done) {
+            finalizePartial(handle, { 'Остановлено': 'поток прерван' });
+        }
+
     } catch (err) {
-        const errMsg = `Ошибка сети: ${escapeHtml(err.message)}`;
-        addTurn(text, errMsg, null, null, null, null, null);
+        if (err.name === 'AbortError') {
+            // Остановка пользователем: частичный ответ показываем, но не сохраняем.
+            if (handle) finalizePartial(handle, { 'Остановлено': 'пользователь' });
+        } else if (handle) {
+            collapseReasoning(handle);
+            appendDelta(handle, `\n\nОшибка сети: ${err.message}`);
+            finalizePartial(handle, null);
+        } else {
+            addTurn(text, `Ошибка сети: ${escapeHtml(err.message)}`, null, null, null, null, null);
+        }
     } finally {
+        chatController = null;
+        btnStop.disabled = true;
+        btnStop.hidden = true;
+        btnSendChat.hidden = false;
         input.disabled = false;
         btnSendChat.disabled = !input.value.trim();
         input.focus();
@@ -490,3 +536,7 @@ window.addEventListener('load', () => {
 window.addEventListener('resize', updateLayoutVars);
 
 btnSendChat.addEventListener('click', sendMessage);
+
+btnStop.addEventListener('click', () => {
+    if (chatController) chatController.abort();
+});

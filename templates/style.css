@@ -353,6 +353,19 @@ body {
     cursor: not-allowed;
 }
 
+.stop-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.stop-btn:not(:disabled) {
+    color: var(--pico-primary);
+}
+
+.icon-btn[hidden] {
+    display: none;
+}
+
 /* ===== Raw JSON accordion ===== */
 .raw-json-toggle {
     margin-top: 8px;

@@ -8,6 +8,17 @@
 - None.
 
 ## Completed
+- [x] #031 Добавить кнопку остановки генерации ответа ИИ
+  - [x] `app.js`: AbortController `chatController`, `flushLive()`/`finalizePartial()`,
+    слушатель `#btn-stop-generation` → `abort()`, бейдж «Остановлено»
+  - [x] `app.js`: взаимное переключение кнопок — send скрыт (`hidden`) во время
+    генерации, показан stop; в `finally` — обратно
+  - [x] `index.html`: кнопка stop с `hidden` по умолчанию, иконка — закрашенный квадрат
+  - [x] `style.css`: `.icon-btn[hidden] { display: none; }` (перебивает `display:flex`)
+  - [x] `docs/ARCHITECTURE.md`: Request Flow — шаг stop, done-only append
+  - [x] Тесты (13) + `ruff check .` + `node --check templates/app.js`
+  - [x] Проверка в браузере (стоп → частичный ответ, история не сохраняется)
+
 - [x] #029 Показывать размышление модели и стартовать поток сразу
   - [x] `llm.py`: кадры `start` и `reasoning`, ключ `reasoning` в `done`
   - [x] `routers/chat.py`: пробросить `reasoning` в финальный кадр
